@@ -2,7 +2,7 @@
 export const stats = {
   month: 'APRIL',
   monthlyVolume: 350499074,
-  totalVolume: '$5B+',
+  totalVolume: '$500M+',
   traders: '120k+',
   uptime: '99.98%',
   maxLeverage: '1000x',

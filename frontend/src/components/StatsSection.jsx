@@ -6,10 +6,10 @@ import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const months = ['JAN','FEB','MAR','APRIL','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-// Plausible volume per month (in USD) - lets the month switcher feel alive on the marketing page
+// Plausible volume per month (in USD) — realistic range for an early-stage launch (~5-50M)
 const MONTHLY_VOLUMES = [
-  187_204_311, 224_581_990, 268_119_443, 350_499_074, 412_882_716, 488_193_005,
-  522_447_812, 591_028_633, 643_771_220, 712_004_188, 779_355_661, 854_910_722,
+  5_184_311, 7_581_990, 9_119_443, 12_499_074, 16_882_716, 21_193_005,
+  24_447_812, 29_028_633, 34_771_220, 39_004_188, 44_355_661, 49_910_722,
 ];
 
 function useCountUp(target, duration = 1800, start = false) {

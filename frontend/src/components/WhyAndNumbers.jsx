@@ -36,11 +36,11 @@ export default function WhyAndNumbers() {
     axios.get(`${API}/stats/landing`).then(r => setLive(r.data)).catch(() => {});
   }, []);
 
-  // total volume in billions, fallback to 5B
-  const volB = Math.max(5, Math.round((live.total_volume || 0) / 1e9));
+  // total volume in millions, fallback to 500M
+  const volM = Math.max(500, Math.round((live.total_volume || 0) / 1e6));
   // users in thousands, fallback to 120k
   const usersK = Math.max(120, Math.round((live.users || 0) / 1000));
-  const vol = useCount(volB, inView);
+  const vol = useCount(volM, inView);
   const traders = useCount(usersK, inView);
   const uptime = useCount(9998, inView);
   const lev = useCount(1000, inView);
@@ -78,7 +78,7 @@ export default function WhyAndNumbers() {
         {/* Numbers */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-center">
           {[
-            { label: 'TRADING VOLUME', value: `$${vol}B+` },
+            { label: 'TRADING VOLUME', value: `$${vol}M+` },
             { label: 'TRADERS', value: `${traders}k+` },
             { label: 'UPTIME', value: `${(uptime/100).toFixed(2)}%` },
             { label: 'MAX LEVERAGE', value: `${lev}x` },

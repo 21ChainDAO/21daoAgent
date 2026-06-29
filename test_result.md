@@ -495,17 +495,28 @@ frontend:
       - working: "NA"
         agent: "testing"
         comment: "Frontend testing not performed as per system instructions (testing agent only tests backend)."
+  
+  - task: "Privy X (Twitter) Login Integration"
+    implemented: true
+    working: false
+    file: "/app/frontend/src/app/PrivyWrapper.jsx"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "USER REPORTED BUG CONFIRMED: 'Privy login with X doesnt work'. COMPREHENSIVE TESTING PERFORMED: (1) ✅ Page loads correctly at https://terminal-degen.preview.emergentagent.com/app with title 'DegensBet' and logo visible. (2) ✅ Privy SDK integration is correct - modal opens when clicking 'CONNECT WITH X' button. (3) ✅ Privy modal displays with Twitter and Wallet login options. (4) ✅ Twitter button is present and clickable in modal. (5) ❌ CRITICAL ISSUE: When Twitter button is clicked, Privy throws error 'Login with Twitter not allowed' (red error screen captured in screenshot). (6) ✅ Mobile responsiveness works (390x844). (7) ⚠️ Console warnings: 'App configuration has Solana wallet login enabled, but no Solana wallet connectors have been passed to Privy' (non-critical, wallet login still works). ROOT CAUSE: PRIVY DASHBOARD CONFIGURATION ISSUE - Twitter/X login is not properly configured in Privy dashboard for App ID cmq45366d00c60cleqhgf79jl. This is NOT a code issue - the integration is correct. SOLUTION REQUIRED: (1) Go to https://dashboard.privy.io and select app cmq45366d00c60cleqhgf79jl, (2) Enable Twitter login method in Login Methods > Socials tab, (3) Add domain https://terminal-degen.preview.emergentagent.com to Allowed Domains, (4) Configure Twitter OAuth credentials (Consumer API Key and Secret from Twitter Developer Portal - app must be 'Confidential client' type). EVIDENCE: Screenshots captured showing Privy modal opening correctly, Twitter button present, and error 'Login with Twitter not allowed' when clicked."
 
 metadata:
   created_by: "testing_agent"
-  version: "1.5"
-  test_sequence: 6
-  run_ui: false
+  version: "1.6"
+  test_sequence: 7
+  run_ui: true
 
 test_plan:
   current_focus:
-    - "Trading pairs swap verified - 8 Solana memecoins via DexScreener"
-    - "All backend endpoints tested and functional"
+    - "Privy X (Twitter) Login - Dashboard configuration required"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -524,3 +535,5 @@ agent_communication:
     message: "🚨 ADMIN + AUTO-WITHDRAWAL ENDPOINTS TEST COMPLETE - CRITICAL BUG FOUND! Tested all 9 scenarios from review request. PASSED: (1) User setup with DB-faked deposits, (2) Admin endpoint guards (403 for non-admins), (3) Admin promotion via ADMIN_X_HANDLES env, (4) Admin overview/withdrawals/keystatus endpoints, (5) Admin approve (correctly fails with 503 when TREASURY_PRIVKEY empty), (6) Admin reject (correctly refunds user), (7) Insufficient balance rejection, (8) Regression (7 pairs, 2 competitions). CRITICAL BUG: Auto-to-manual withdrawal fallback incorrectly refunds balance. When TREASURY_PRIVKEY is empty and auto-eligible withdrawal fails, backend refunds the amount to user's balance (lines 783-789 in server.py) instead of keeping it reserved for the pending manual withdrawal. This allows users to withdraw funds without balance deduction. FIX REQUIRED: Remove the refund logic - balance should remain deducted for manual withdrawal. Also creates duplicate withdrawal records (auto_failed + manual) instead of just manual."
   - agent: "testing"
     message: "🎉 WITHDRAWAL FIX RE-TEST COMPLETE - ALL 5 TESTS PASSED! Verified the withdrawal fix is working correctly. Test results: (1) ✅ Reset test user (privy_id=wd_test_1, real.balance=750, total_sol_deposited=1.0, total_sol_withdrawn_auto=0), (2) ✅ Auto-eligible withdrawal (0.5 SOL) converts cleanly to single manual record with correct balance deduction ($750→$712.82, no refund, no auto_failed records), (3) ✅ Mixed withdrawal (1.4 SOL) creates single manual record with correct balance deduction ($750→$645.90), (4) ✅ Admin reject correctly refunds balance ($645.90→$750.00), (5) ✅ Regression test confirms GET /api/markets/prices returns 7 pairs. FIX VERIFIED: When TREASURY_PRIVKEY is empty and auto-eligible withdrawal fails, backend now correctly folds auto portion into manual_sol (lines 784-788) instead of refunding, keeping balance deducted for pending manual withdrawal. No duplicate withdrawal records created. Backend withdrawal system is FULLY FUNCTIONAL."
+  - agent: "testing"
+    message: "🚨 PRIVY X (TWITTER) LOGIN BUG CONFIRMED - DASHBOARD CONFIGURATION ISSUE! User reported: 'Privy login with X doesnt work'. COMPREHENSIVE PLAYWRIGHT TESTING PERFORMED at https://terminal-degen.preview.emergentagent.com/app following detailed test protocol. FINDINGS: (1) ✅ Page loads correctly (title='DegensBet', logo visible, no errors), (2) ✅ Privy SDK integration is correct - modal opens when clicking 'CONNECT WITH X', (3) ✅ Privy modal displays with 'Twitter' and 'Continue with a wallet' options, (4) ✅ Twitter button is present and clickable, (5) ❌ CRITICAL: Clicking Twitter button throws error 'Login with Twitter not allowed' (red error screen captured), (6) ✅ Mobile responsive (390x844), (7) ⚠️ Console warning: 'App configuration has Solana wallet login enabled, but no Solana wallet connectors have been passed to Privy' (non-critical). ROOT CAUSE: PRIVY DASHBOARD CONFIGURATION ISSUE for App ID cmq45366d00c60cleqhgf79jl. Twitter/X login is NOT properly enabled/configured in Privy dashboard. This is NOT a code issue - the @privy-io/react-auth integration is correct. SOLUTION: Access https://dashboard.privy.io, select app cmq45366d00c60cleqhgf79jl, then: (1) Enable Twitter login in Login Methods > Socials, (2) Add https://terminal-degen.preview.emergentagent.com to Allowed Domains, (3) Configure Twitter OAuth credentials (Consumer API Key/Secret from Twitter Developer Portal - app must be 'Confidential client'). EVIDENCE: 4 screenshots captured showing login page, Privy modal with Twitter option, and error message. This is a CONFIGURATION issue, not a CODE issue."

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 
-// Placeholder until $DEGEN launches. Swap this constant once the contract is live.
-const DEGEN_CA = 'TBA';
+// Live $DEGEN contract address (Solana).
+const DEGEN_CA = 'BkEqYRg7CqHwuEeUk1eyvAurcaUMzT9R1Xi3ZByspump';
 
 /**
  * Fixed bottom-right pixel-card showing the $DEGEN contract address.

@@ -3,6 +3,14 @@ import { api, fmtUsd } from '../lib/api';
 import { useAppUser } from './UserSync';
 import { Swords, Crown, Trophy, Users } from 'lucide-react';
 
+function formatDbet(n) {
+  if (!n) return '0';
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(0) + 'K';
+  return n.toLocaleString();
+}
+
 export default function Competitions() {
   const { dbUser, refresh } = useAppUser();
   const [comps, setComps] = useState([]);
@@ -84,7 +92,10 @@ function CompCard({ comp, board, onJoin, busy, realBalance }) {
       <div className="grid grid-cols-2 gap-3 mb-5">
         <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-3">
           <div className="font-pixel text-[7px] text-[#808080]">PRIZE POOL</div>
-          <div className="font-pixel text-[20px] glow-green">{fmtUsd(comp.prize_pool_usd)}</div>
+          <div className="font-pixel text-[18px] glow-green">{fmtUsd(comp.prize_pool_usd)}</div>
+          {comp.prize_pool_dbet && (
+            <div className="font-pixel text-[10px] text-[#ffe93d] mt-1">+ {formatDbet(comp.prize_pool_dbet)} dBET</div>
+          )}
         </div>
         <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-3">
           <div className="font-pixel text-[7px] text-[#808080]">PARTICIPANTS</div>
@@ -98,12 +109,17 @@ function CompCard({ comp, board, onJoin, busy, realBalance }) {
         <div className="font-pixel text-[8px] text-[#808080] mb-2">// PRIZE STRUCTURE</div>
         <div className="space-y-1">
           {comp.prize_structure.map((p, i) => (
-            <div key={i} className="flex justify-between font-mono text-[14px]">
-              <span className="text-[#808080]">#{p.rank}</span>
-              <span className="text-white">
-                {p.amount_each
-                  ? `${fmtUsd(p.amount_each)} each (×${p.split_count})`
-                  : fmtUsd(p.amount)}
+            <div key={i} className="flex justify-between font-mono text-[14px] gap-2">
+              <span className="text-[#808080] shrink-0">#{p.rank}</span>
+              <span className="text-right">
+                <span className="text-white">
+                  {p.amount_each ? `${fmtUsd(p.amount_each)} each` : fmtUsd(p.amount)}
+                </span>
+                {(p.dbet || p.dbet_each) && (
+                  <span className="text-[#ffe93d] ml-2">
+                    + {formatDbet(p.dbet_each || p.dbet)} dBET{p.dbet_each ? ' ea' : ''}
+                  </span>
+                )}
               </span>
             </div>
           ))}

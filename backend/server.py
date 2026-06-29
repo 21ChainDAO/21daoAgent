@@ -576,11 +576,13 @@ DEFAULT_COMPETITIONS = [
         "account_type": "paper",
         "entry_fee_sol": 1.0,
         "prize_pool_usd": 10000,
+        "prize_pool_dbet": 30_000_000,
         "prize_structure": [
-            {"rank": 1, "amount": 3300},
-            {"rank": 2, "amount": 2200},
-            {"rank": 3, "amount": 1100},
-            {"rank": "4-10", "amount_each": 485, "split_count": 7, "total": 3395},  # ~10k; tweak
+            {"rank": 1,      "amount": 3300, "dbet": 10_500_000},
+            {"rank": 2,      "amount": 2200, "dbet":  7_000_000},
+            {"rank": 3,      "amount": 1100, "dbet":  3_500_000},
+            {"rank": "4-10", "amount_each": 400, "dbet_each": 1_285_000, "split_count": 7,
+             "total": 2800, "dbet_total": 8_995_000},
         ],
         "status": "open",
         "start_at": None,
@@ -592,11 +594,13 @@ DEFAULT_COMPETITIONS = [
         "account_type": "real",
         "entry_fee_sol": 10.0,
         "prize_pool_usd": 100000,
+        "prize_pool_dbet": 70_000_000,
         "prize_structure": [
-            {"rank": 1, "amount": 33000},
-            {"rank": 2, "amount": 22000},
-            {"rank": 3, "amount": 11000},
-            {"rank": "4-10", "amount_each": 4000, "split_count": 7, "total": 28000},
+            {"rank": 1,      "amount": 33000, "dbet": 25_000_000},
+            {"rank": 2,      "amount": 22000, "dbet": 16_000_000},
+            {"rank": 3,      "amount": 11000, "dbet":  8_000_000},
+            {"rank": "4-10", "amount_each": 4000, "dbet_each": 3_000_000, "split_count": 7,
+             "total": 28000, "dbet_total": 21_000_000},
         ],
         "status": "open",
         "start_at": None,
@@ -606,9 +610,13 @@ DEFAULT_COMPETITIONS = [
 
 async def ensure_default_competitions():
     for c in DEFAULT_COMPETITIONS:
-        exists = await db.competitions.find_one({"id": c["id"]})
-        if not exists:
-            doc = dict(c)
+        # always upsert so prize structure stays in sync after updates
+        existing = await db.competitions.find_one({"id": c["id"]})
+        doc = dict(c)
+        if existing:
+            doc["start_at"] = existing.get("start_at") or now()
+            await db.competitions.update_one({"id": c["id"]}, {"$set": doc})
+        else:
             doc["start_at"] = now()
             await db.competitions.insert_one(doc)
 
@@ -817,6 +825,24 @@ async def my_withdrawals(x_privy_id: str = Header(...)):
     u = await get_user_or_404(x_privy_id)
     docs = await db.withdrawals.find({"user_id": u["id"]}, {"_id": 0}).sort("requested_at", -1).to_list(50)
     return {"withdrawals": docs}
+
+# ---------------- Routes: token ----------------
+@api.get("/token")
+async def token_info():
+    return {
+        "symbol": "dBET",
+        "name": "DegensBet Token",
+        "contract": os.environ.get("DBET_CONTRACT") or "TBA",
+        "chain": "Solana",
+        "total_supply": 1_000_000_000,
+        "tokenomics": [
+            {"label": "LOCKED",            "pct": 50, "amount": 500_000_000, "color": "#ff3838"},
+            {"label": "REWARDS / GIVEAWAYS", "pct": 10, "amount": 100_000_000, "color": "#ffe93d"},
+            {"label": "REAL COMPETITION",  "pct": 7,  "amount":  70_000_000, "color": "#00FF29"},
+            {"label": "PAPER COMPETITION", "pct": 3,  "amount":  30_000_000, "color": "#13b84d"},
+            {"label": "FAIR LAUNCH",       "pct": 30, "amount": 300_000_000, "color": "#F5F5F5"},
+        ],
+    }
 
 # ---------------- Routes: landing stats ----------------
 @api.get("/stats/landing")

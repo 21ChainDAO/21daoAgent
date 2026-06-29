@@ -8,8 +8,12 @@ import StatsSection from './components/StatsSection';
 import Features from './components/Features';
 import TradingPreview from './components/TradingPreview';
 import WhyAndNumbers from './components/WhyAndNumbers';
+import TokenSection from './components/TokenSection';
 import Footer from './components/Footer';
 import AppPortal from './app/AppPortal';
+import Docs from './pages/Docs';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 
 function Landing() {
   return (
@@ -21,6 +25,7 @@ function Landing() {
         <StatsSection />
         <Features />
         <TradingPreview />
+        <TokenSection />
         <WhyAndNumbers />
         <Footer />
       </div>
@@ -33,6 +38,9 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/docs" element={<Docs />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="/app/*" element={<AppPortal />} />
       </Routes>
     </BrowserRouter>

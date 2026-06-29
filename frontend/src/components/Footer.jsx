@@ -1,11 +1,23 @@
 import React from 'react';
-import PixelLogo from './PixelLogo';
-import { Twitter, Github, MessageCircle, Send } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Twitter } from 'lucide-react';
 
 const cols = [
-  { title: 'PRODUCT', links: ['Trade', 'Markets', 'Leaderboard', 'API'] },
-  { title: 'COMMUNITY', links: ['Twitter', 'Discord', 'Telegram', 'Blog'] },
-  { title: 'RESOURCES', links: ['Docs', 'Whitepaper', 'Audits', 'Brand'] },
+  { title: 'PRODUCT', links: [
+    { label: 'Trade', to: '/app/trade' },
+    { label: 'Competitions', to: '/app/competitions' },
+    { label: 'Leaderboard', to: '/app/leaderboard' },
+    { label: 'Launch App', to: '/app' },
+  ]},
+  { title: 'TOKEN', links: [
+    { label: '$dBET', to: '/#token', external: false },
+    { label: 'Tokenomics', to: '/#token', external: false },
+  ]},
+  { title: 'RESOURCES', links: [
+    { label: 'How It Works', to: '/docs' },
+    { label: 'Terms', to: '/terms' },
+    { label: 'Privacy', to: '/privacy' },
+  ]},
 ];
 
 export default function Footer() {
@@ -19,12 +31,10 @@ export default function Footer() {
               The pixel arcade for crypto degenerates. High stakes. Higher payouts.
             </p>
             <div className="flex gap-3 mt-6">
-              {[Twitter, Github, MessageCircle, Send].map((Icon, i) => (
-                <a key={i} href="#" onClick={(e)=>e.preventDefault()}
-                  className="w-10 h-10 flex items-center justify-center border-2 border-[#1f1f1f] text-[#808080] hover:text-[#00FF29] hover:border-[#00FF29] transition-colors">
-                  <Icon size={16} />
-                </a>
-              ))}
+              <a href="https://x.com/0xdegensbet" target="_blank" rel="noreferrer"
+                className="w-10 h-10 flex items-center justify-center border-2 border-[#1f1f1f] text-[#808080] hover:text-[#00FF29] hover:border-[#00FF29] transition-colors">
+                <Twitter size={16} />
+              </a>
             </div>
           </div>
 
@@ -33,11 +43,11 @@ export default function Footer() {
               <div className="font-pixel text-[9px] text-[#00FF29] mb-4 tracking-[0.2em]">{c.title}</div>
               <ul className="space-y-3">
                 {c.links.map(l => (
-                  <li key={l}>
-                    <a href="#" onClick={(e)=>e.preventDefault()}
+                  <li key={l.label}>
+                    <Link to={l.to}
                       className="font-mono text-[18px] text-[#808080] hover:text-[#F5F5F5] hover:underline decoration-[#00FF29]">
-                      {l}
-                    </a>
+                      {l.label}
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -51,10 +61,10 @@ export default function Footer() {
 
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="font-pixel text-[8px] text-[#808080]">
-            © {new Date().getFullYear()} DEGENSBET // ALL RIGHTS RESERVED
+            &copy; {new Date().getFullYear()} DEGENSBET // ALL RIGHTS RESERVED
           </div>
           <div className="font-pixel text-[8px] text-[#808080]">
-            BUILD 0x4A2F · <span className="text-[#00FF29] flicker">MAINNET ONLINE</span>
+            BUILD 0x4A2F &middot; <span className="text-[#00FF29] flicker">MAINNET ONLINE</span>
           </div>
         </div>
       </div>

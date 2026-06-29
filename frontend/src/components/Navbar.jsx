@@ -3,7 +3,13 @@ import { Link } from 'react-router-dom';
 import PixelLogo from './PixelLogo';
 import { Menu, X } from 'lucide-react';
 
-const links = ['TRADE', 'MARKETS', 'LEADERBOARD', 'DOCS', 'COMMUNITY'];
+const links = [
+  { label: 'TRADE', to: '/app/trade' },
+  { label: 'COMPETITIONS', to: '/app/competitions' },
+  { label: 'LEADERBOARD', to: '/app/leaderboard' },
+  { label: '$DBET', to: '/#token' },
+  { label: 'DOCS', to: '/docs' },
+];
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -16,14 +22,13 @@ export default function Navbar() {
 
         <nav className="hidden md:flex items-center gap-8">
           {links.map(l => (
-            <a
-              key={l}
-              href="#"
+            <Link
+              key={l.label}
+              to={l.to}
               className="font-pixel text-[10px] text-[#808080] hover:text-[#00FF29] transition-colors"
-              onClick={(e) => e.preventDefault()}
             >
-              {l}
-            </a>
+              {l.label}
+            </Link>
           ))}
         </nav>
 
@@ -40,7 +45,7 @@ export default function Navbar() {
       {open && (
         <div className="md:hidden border-t border-[#1f1f1f] bg-[#050505] px-6 py-4 flex flex-col gap-4">
           {links.map(l => (
-            <a key={l} href="#" className="font-pixel text-[10px] text-[#808080]" onClick={(e)=>e.preventDefault()}>{l}</a>
+            <Link key={l.label} to={l.to} className="font-pixel text-[10px] text-[#808080]">{l.label}</Link>
           ))}
           <div className="flex gap-3 mt-2">
             <Link to="/app" className="pixel-btn pixel-btn-secondary !py-2 !px-4 !text-[9px]">CONNECT</Link>

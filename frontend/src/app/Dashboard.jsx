@@ -4,14 +4,15 @@ import { useAccount } from './AccountContext';
 import { api, fmtUsd, formatPrice } from '../lib/api';
 import { usePrices } from './PricesProvider';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, ArrowDownRight, Swords } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Swords, Wallet, TrendingUp, TrendingDown } from 'lucide-react';
 
 export default function Dashboard() {
   const { dbUser } = useAppUser();
-  const { account } = useAccount();
+  const { account, setAccount } = useAccount();
   const { prices } = usePrices();
   const [openPos, setOpenPos] = useState([]);
   const [history, setHistory] = useState([]);
+  const [otherOpenPos, setOtherOpenPos] = useState([]);
 
   const loadPositions = async () => {
     try {
@@ -19,6 +20,9 @@ export default function Dashboard() {
       setOpenPos(o.data.positions);
       const h = await api.get(`/positions/me?account_type=${account}`);
       setHistory(h.data.positions.filter(p => p.status !== 'open').slice(0, 8));
+      const otherAcct = account === 'real' ? 'paper' : 'real';
+      const oo = await api.get(`/positions/me?account_type=${otherAcct}&status=open`);
+      setOtherOpenPos(oo.data.positions);
     } catch (e) { /* noop */ }
   };
 
@@ -34,7 +38,18 @@ export default function Dashboard() {
 
   const winRate = acct.trades_count ? ((acct.wins / acct.trades_count) * 100).toFixed(1) : '0.0';
   const unreal = openPos.reduce((s, p) => s + (p.unrealized_pnl || 0), 0);
+  const otherUnreal = otherOpenPos.reduce((s, p) => s + (p.unrealized_pnl || 0), 0);
   const isReal = account === 'real';
+
+  // Balances + equity for BOTH accounts (top banner)
+  const paperBal  = (dbUser.paper?.balance) || 0;
+  const realBal   = (dbUser.real?.balance) || 0;
+  const paperUnr  = isReal ? otherUnreal : unreal;
+  const realUnr   = isReal ? unreal : otherUnreal;
+  const paperEq   = paperBal + paperUnr;
+  const realEq    = realBal + realUnr;
+  const depositedSol = Number(dbUser?.total_sol_deposited || 0);
+  const hasDeposited = depositedSol > 0;
 
   return (
     <div className="space-y-6">
@@ -50,12 +65,57 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {isReal && (acct.balance || 0) < 1 && (
+      {/* ─── BALANCE HERO ─── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <BalancePanel
+          testId="balance-panel-paper"
+          accountKey="paper"
+          active={account === 'paper'}
+          onClick={() => setAccount('paper')}
+          accent="#00FF29"
+          shadow="#0a8a22"
+          label="PAPER BALANCE"
+          balance={paperBal}
+          unreal={paperUnr}
+          equity={paperEq}
+          subline="Practice with virtual funds"
+          cta={null}
+        />
+        <BalancePanel
+          testId="balance-panel-real"
+          accountKey="real"
+          active={account === 'real'}
+          onClick={() => setAccount('real')}
+          accent="#ff3838"
+          shadow="#7a1717"
+          label="REAL BALANCE"
+          balance={realBal}
+          unreal={realUnr}
+          equity={realEq}
+          subline={hasDeposited
+            ? `+${depositedSol.toFixed(4)} SOL deposited \u2022 powered by Helius`
+            : 'No SOL deposited yet'}
+          cta={realBal < 1 && !hasDeposited
+            ? { to: '/app/wallet', text: 'DEPOSIT SOL \u2192' }
+            : { to: '/app/wallet', text: 'WALLET \u2192' }}
+        />
+      </div>
+
+      {isReal && (acct.balance || 0) < 1 && hasDeposited && (
+        <div className="pixel-card p-4 border-[#ffe93d]" style={{ borderColor: '#ffe93d' }}>
+          <div className="font-pixel text-[9px] text-[#ffe93d]">! REAL BALANCE LOW</div>
+          <div className="font-mono text-[16px] text-[#808080] mt-1">
+            Your deposit was credited but balance is low. Top up to keep trading.
+            <Link to="/app/wallet" className="text-[#00FF29] hover:underline ml-1">WALLET \u2192</Link>
+          </div>
+        </div>
+      )}
+      {isReal && (acct.balance || 0) < 1 && !hasDeposited && (
         <div className="pixel-card p-4 border-[#ffe93d]" style={{ borderColor: '#ffe93d' }}>
           <div className="font-pixel text-[9px] text-[#ffe93d]">! REAL ACCOUNT EMPTY</div>
           <div className="font-mono text-[16px] text-[#808080] mt-1">
-            Send SOL to your deposit address (top-right) and it will be credited to your real balance automatically.
-            <Link to="/app/wallet" className="text-[#00FF29] hover:underline ml-1">GO TO WALLET →</Link>
+            Send SOL to your deposit address and it will be credited automatically.
+            <Link to="/app/wallet" className="text-[#00FF29] hover:underline ml-1">GO TO WALLET \u2192</Link>
           </div>
         </div>
       )}
@@ -174,5 +234,65 @@ function StatCard({ label, value, sub, color }) {
       <div className="font-pixel text-[18px]" style={{ color }}>{value}</div>
       {sub && <div className="font-mono text-[13px] text-[#808080] mt-1">{sub}</div>}
     </div>
+  );
+}
+
+function BalancePanel({
+  testId, label, balance, unreal, equity, accent, shadow, active, onClick, subline, cta,
+}) {
+  const unrealUp = unreal >= 0;
+  return (
+    <button
+      data-testid={testId}
+      onClick={onClick}
+      className="text-left pixel-card p-5 transition-transform hover:-translate-y-0.5 relative"
+      style={{
+        borderColor: active ? accent : '#1f1f1f',
+        boxShadow: active ? `0 6px 0 0 ${shadow}` : 'none',
+        background: active ? '#0a0a0a' : '#070707',
+      }}
+    >
+      {active && (
+        <span
+          className="absolute top-2 right-2 font-pixel text-[7px] px-2 py-1"
+          style={{ background: accent, color: '#050505' }}
+        >ACTIVE</span>
+      )}
+
+      <div className="flex items-center gap-2 mb-3">
+        <Wallet size={14} style={{ color: accent }} />
+        <span className="font-pixel text-[8px] tracking-[0.18em]" style={{ color: accent }}>
+          // {label}
+        </span>
+      </div>
+
+      <div className="font-pixel text-[34px] sm:text-[42px] text-white leading-none mb-2"
+           style={{ textShadow: active ? `0 0 14px ${accent}55` : 'none' }}>
+        {fmtUsd(balance)}
+      </div>
+
+      <div className="flex items-center gap-3 flex-wrap mb-3">
+        <span className={`font-pixel text-[9px] flex items-center gap-1 ${unrealUp ? 'text-[#00FF29]' : 'text-[#ff3838]'}`}>
+          {unrealUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+          {fmtUsd(unreal, { sign: true })}
+          <span className="text-[#808080] ml-1">unreal</span>
+        </span>
+        <span className="font-pixel text-[9px] text-[#808080]">
+          EQUITY <span className="text-white">{fmtUsd(equity)}</span>
+        </span>
+      </div>
+
+      <div className="font-mono text-[13px] text-[#808080] mb-1">{subline}</div>
+
+      {cta && (
+        <span
+          className="font-pixel text-[8px] mt-2 inline-flex items-center gap-1 hover:underline"
+          style={{ color: accent }}
+          onClick={(e) => { e.stopPropagation(); window.location.href = cta.to; }}
+        >
+          {cta.text}
+        </span>
+      )}
+    </button>
   );
 }

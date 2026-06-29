@@ -4,11 +4,13 @@ import { usePrivy } from '@privy-io/react-auth';
 import PrivyWrapper from './PrivyWrapper';
 import UserSync, { useAppUser } from './UserSync';
 import PricesProvider from './PricesProvider';
+import AccountProvider from './AccountContext';
 import Login from './Login';
 import AppShell from './AppShell';
 import Dashboard from './Dashboard';
 import TradeView from './TradeView';
 import Leaderboard from './Leaderboard';
+import Competitions from './Competitions';
 import WalletPage from './WalletPage';
 
 function Guard({ children }) {
@@ -36,19 +38,22 @@ export default function AppPortal() {
   return (
     <PrivyWrapper>
       <UserSync>
-        <PricesProvider>
-          <Guard>
-            <AppShell>
-              <Routes>
-                <Route index element={<Dashboard />} />
-                <Route path="trade" element={<TradeView />} />
-                <Route path="leaderboard" element={<Leaderboard />} />
-                <Route path="wallet" element={<WalletPage />} />
-                <Route path="*" element={<Navigate to="/app" replace />} />
-              </Routes>
-            </AppShell>
-          </Guard>
-        </PricesProvider>
+        <AccountProvider>
+          <PricesProvider>
+            <Guard>
+              <AppShell>
+                <Routes>
+                  <Route index element={<Dashboard />} />
+                  <Route path="trade" element={<TradeView />} />
+                  <Route path="competitions" element={<Competitions />} />
+                  <Route path="leaderboard" element={<Leaderboard />} />
+                  <Route path="wallet" element={<WalletPage />} />
+                  <Route path="*" element={<Navigate to="/app" replace />} />
+                </Routes>
+              </AppShell>
+            </Guard>
+          </PricesProvider>
+        </AccountProvider>
       </UserSync>
     </PrivyWrapper>
   );

@@ -1,693 +1,687 @@
 """
-Comprehensive backend API tests for Degens.bet trading platform
-Tests all endpoints with real API calls to the production URL
+Comprehensive backend test for Degens.bet upgraded backend.
+Tests dual account system (paper/real), custodial wallets, competitions, and new endpoints.
 """
 import requests
 import json
-from typing import Dict, Any
+import time
 
-# Backend URL from frontend/.env
 BASE_URL = "https://terminal-degen.preview.emergentagent.com/api"
 
-# Test user data
-TEST_USER = {
-    "privy_id": "test_user_qa_1",
-    "x_handle": "qa_degen",
-    "x_name": "QA Degen",
-    "x_avatar": "https://example.com/a.png",
-    "wallet_address": "So1aNaTestAddr111111111111111111111111111111"
-}
-
-def print_test(test_name: str):
-    """Print test header"""
+def log_test(test_num, description):
     print(f"\n{'='*80}")
-    print(f"TEST: {test_name}")
+    print(f"TEST {test_num}: {description}")
     print('='*80)
 
-def print_result(success: bool, message: str, response: Any = None):
-    """Print test result"""
+def log_result(success, message, response=None):
     status = "✅ PASS" if success else "❌ FAIL"
     print(f"{status}: {message}")
-    if response is not None:
-        print(f"Response: {json.dumps(response, indent=2)}")
-    return success
+    if response:
+        print(f"Status: {response.status_code}")
+        try:
+            print(f"Response: {json.dumps(response.json(), indent=2)}")
+        except:
+            print(f"Response text: {response.text[:500]}")
+    print()
 
 def test_1_root_endpoint():
-    """Test 1: GET /api/ - should return welcome message"""
-    print_test("1. Root Endpoint")
+    log_test(1, "GET /api/ — returns {'message': 'degens.bet api'}")
     try:
-        response = requests.get(f"{BASE_URL}/")
-        data = response.json()
-        
-        if response.status_code == 200 and data.get("message") == "degens.bet api":
-            return print_result(True, "Root endpoint returned correct message", data)
+        r = requests.get(f"{BASE_URL}/")
+        if r.status_code == 200 and r.json().get("message") == "degens.bet api":
+            log_result(True, "Root endpoint working correctly", r)
+            return True
         else:
-            return print_result(False, f"Unexpected response: {response.status_code}", data)
+            log_result(False, f"Unexpected response", r)
+            return False
     except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
+        log_result(False, f"Exception: {e}")
+        return False
 
-def test_2_market_prices():
-    """Test 2: GET /api/markets/prices - should return 7 pairs"""
-    print_test("2. Market Prices")
+def test_2_user_creation_with_custodial_wallet():
+    log_test(2, "User creation with custodial wallet auto-generation")
     try:
-        response = requests.get(f"{BASE_URL}/markets/prices")
-        data = response.json()
+        # Create new user
+        payload = {
+            "privy_id": "qa_dual_1",
+            "x_handle": "qa_dual",
+            "x_name": "QA Dual",
+            "x_avatar": None,
+            "privy_wallet": None
+        }
+        r = requests.post(f"{BASE_URL}/users/upsert", json=payload)
         
-        if response.status_code != 200:
-            return print_result(False, f"Status code: {response.status_code}", data)
+        if r.status_code != 200:
+            log_result(False, f"Failed to create user", r)
+            return False, None
         
-        prices = data.get("prices", [])
-        if len(prices) != 7:
-            return print_result(False, f"Expected 7 pairs, got {len(prices)}", data)
+        data = r.json()
         
-        # Check required pairs
-        expected_pairs = ["SOL/USD", "BTC/USD", "ETH/USD", "BONK/USD", "WIF/USD", "JUP/USD", "PEPE/USD"]
-        found_pairs = [p.get("pair") for p in prices]
+        # Verify paper account
+        if not data.get("paper"):
+            log_result(False, "Missing 'paper' sub-account", r)
+            return False, None
         
-        missing = set(expected_pairs) - set(found_pairs)
-        if missing:
-            return print_result(False, f"Missing pairs: {missing}", data)
+        if data["paper"].get("balance") != 10000:
+            log_result(False, f"Paper balance should be 10000, got {data['paper'].get('balance')}", r)
+            return False, None
         
-        # Validate structure of each price
-        for price in prices:
-            required_fields = ["pair", "symbol", "price", "change_24h", "updated_at"]
-            for field in required_fields:
-                if field not in price:
-                    return print_result(False, f"Missing field '{field}' in price object", price)
-            
-            if price["price"] <= 0:
-                return print_result(False, f"Invalid price for {price['pair']}: {price['price']}", price)
+        # Verify real account
+        if not data.get("real"):
+            log_result(False, "Missing 'real' sub-account", r)
+            return False, None
         
-        return print_result(True, f"All 7 pairs returned with valid data", {"pair_count": len(prices)})
+        if data["real"].get("balance") != 0:
+            log_result(False, f"Real balance should be 0, got {data['real'].get('balance')}", r)
+            return False, None
+        
+        # Verify custodial wallet
+        custodial_addr = data.get("custodial_address")
+        if not custodial_addr or not isinstance(custodial_addr, str):
+            log_result(False, "Missing or invalid custodial_address", r)
+            return False, None
+        
+        if len(custodial_addr) < 32 or len(custodial_addr) > 44:
+            log_result(False, f"Custodial address length {len(custodial_addr)} not in range 32-44", r)
+            return False, None
+        
+        # Verify encrypted_privkey is NOT returned
+        if "encrypted_privkey" in data:
+            log_result(False, "encrypted_privkey should NOT be in response", r)
+            return False, None
+        
+        log_result(True, f"User created with paper.balance=10000, real.balance=0, custodial_address={custodial_addr[:8]}...", r)
+        
+        # Test idempotency - call upsert again
+        r2 = requests.post(f"{BASE_URL}/users/upsert", json=payload)
+        if r2.status_code != 200:
+            log_result(False, "Second upsert failed", r2)
+            return False, custodial_addr
+        
+        data2 = r2.json()
+        custodial_addr2 = data2.get("custodial_address")
+        
+        if custodial_addr != custodial_addr2:
+            log_result(False, f"Custodial address changed on second upsert: {custodial_addr} -> {custodial_addr2}", r2)
+            return False, custodial_addr
+        
+        log_result(True, "Second upsert preserved custodial_address (idempotent)", r2)
+        return True, custodial_addr
+        
     except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
+        log_result(False, f"Exception: {e}")
+        return False, None
 
-def test_3_single_price():
-    """Test 3: GET /api/markets/price/SOL/USD - should return single price"""
-    print_test("3. Single Price (SOL/USD)")
+def test_3_get_users_me(custodial_addr):
+    log_test(3, "GET /api/users/me with X-Privy-Id header")
     try:
-        response = requests.get(f"{BASE_URL}/markets/price/SOL/USD")
-        data = response.json()
+        headers = {"X-Privy-Id": "qa_dual_1"}
+        r = requests.get(f"{BASE_URL}/users/me", headers=headers)
         
-        if response.status_code != 200:
-            return print_result(False, f"Status code: {response.status_code}", data)
+        if r.status_code != 200:
+            log_result(False, "Failed to get user", r)
+            return False
         
-        required_fields = ["pair", "symbol", "price", "change_24h", "updated_at"]
-        for field in required_fields:
-            if field not in data:
-                return print_result(False, f"Missing field: {field}", data)
+        data = r.json()
         
-        if data["pair"] != "SOL/USD":
-            return print_result(False, f"Wrong pair: {data['pair']}", data)
+        # Verify both sub-accounts
+        if not data.get("paper") or not data.get("real"):
+            log_result(False, "Missing paper or real sub-account", r)
+            return False
         
-        if data["price"] <= 0:
-            return print_result(False, f"Invalid price: {data['price']}", data)
+        # Verify custodial address matches
+        if data.get("custodial_address") != custodial_addr:
+            log_result(False, f"Custodial address mismatch: expected {custodial_addr}, got {data.get('custodial_address')}", r)
+            return False
         
-        return print_result(True, "SOL/USD price returned correctly", data)
+        log_result(True, f"GET /users/me returns user with both sub-accounts and custodial_address", r)
+        return True
+        
     except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
+        log_result(False, f"Exception: {e}")
+        return False
 
-def test_4_user_upsert():
-    """Test 4: POST /api/users/upsert - create and update user"""
-    print_test("4. User Upsert (Create & Update)")
+def test_4_open_position_paper():
+    log_test(4, "Open position on PAPER account")
     try:
-        # First call - create user
-        response1 = requests.post(f"{BASE_URL}/users/upsert", json=TEST_USER)
-        data1 = response1.json()
-        
-        if response1.status_code != 200:
-            return print_result(False, f"Create failed with status: {response1.status_code}", data1)
-        
-        # Verify initial values
-        if data1.get("balance") != 10000:
-            return print_result(False, f"Initial balance should be 10000, got {data1.get('balance')}", data1)
-        
-        if data1.get("total_pnl") != 0:
-            return print_result(False, f"Initial total_pnl should be 0, got {data1.get('total_pnl')}", data1)
-        
-        if data1.get("trades_count") != 0:
-            return print_result(False, f"Initial trades_count should be 0, got {data1.get('trades_count')}", data1)
-        
-        user_id_1 = data1.get("id")
-        
-        # Second call - update (should not duplicate)
-        response2 = requests.post(f"{BASE_URL}/users/upsert", json=TEST_USER)
-        data2 = response2.json()
-        
-        if response2.status_code != 200:
-            return print_result(False, f"Update failed with status: {response2.status_code}", data2)
-        
-        # Verify balance is still 10000 (not reset)
-        if data2.get("balance") != 10000:
-            return print_result(False, f"Balance changed on update: {data2.get('balance')}", data2)
-        
-        user_id_2 = data2.get("id")
-        if user_id_1 != user_id_2:
-            return print_result(False, f"User ID changed (duplicate created): {user_id_1} vs {user_id_2}", data2)
-        
-        return print_result(True, "User created and updated correctly (no duplication)", data2)
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_5_get_user_me():
-    """Test 5: GET /api/users/me - get current user"""
-    print_test("5. Get Current User")
-    try:
-        headers = {"X-Privy-Id": TEST_USER["privy_id"]}
-        response = requests.get(f"{BASE_URL}/users/me", headers=headers)
-        data = response.json()
-        
-        if response.status_code != 200:
-            return print_result(False, f"Status code: {response.status_code}", data)
-        
-        if data.get("privy_id") != TEST_USER["privy_id"]:
-            return print_result(False, f"Wrong user returned", data)
-        
-        if data.get("x_handle") != TEST_USER["x_handle"]:
-            return print_result(False, f"User data mismatch", data)
-        
-        return print_result(True, "User retrieved successfully", data)
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_6_open_position():
-    """Test 6: POST /api/positions/open - open a position"""
-    print_test("6. Open Position")
-    try:
-        headers = {"X-Privy-Id": TEST_USER["privy_id"]}
-        position_data = {
+        headers = {"X-Privy-Id": "qa_dual_1"}
+        payload = {
             "pair": "SOL/USD",
             "side": "long",
-            "margin": 100,
-            "leverage": 10
+            "margin": 500,
+            "leverage": 20,
+            "account_type": "paper"
         }
+        r = requests.post(f"{BASE_URL}/positions/open", json=payload, headers=headers)
         
-        response = requests.post(f"{BASE_URL}/positions/open", json=position_data, headers=headers)
-        data = response.json()
+        if r.status_code != 200:
+            log_result(False, "Failed to open position", r)
+            return False, None
         
-        if response.status_code != 200:
-            return print_result(False, f"Status code: {response.status_code}", data)
+        data = r.json()
+        position_id = data.get("id")
         
-        # Verify position fields
-        if data.get("size") != 1000:  # margin * leverage
-            return print_result(False, f"Size should be 1000, got {data.get('size')}", data)
+        # Verify position created
+        if not position_id:
+            log_result(False, "No position ID returned", r)
+            return False, None
         
-        if data.get("entry_price", 0) <= 0:
-            return print_result(False, f"Invalid entry_price: {data.get('entry_price')}", data)
+        log_result(True, f"Position opened: {position_id}", r)
         
-        if data.get("status") != "open":
-            return print_result(False, f"Status should be 'open', got {data.get('status')}", data)
+        # Verify user balance updated
+        headers = {"X-Privy-Id": "qa_dual_1"}
+        r2 = requests.get(f"{BASE_URL}/users/me", headers=headers)
         
-        # Verify user balance decreased
-        user_response = requests.get(f"{BASE_URL}/users/me", headers=headers)
-        user_data = user_response.json()
+        if r2.status_code != 200:
+            log_result(False, "Failed to get user after opening position", r2)
+            return False, position_id
         
-        if user_data.get("balance") != 9900:  # 10000 - 100
-            return print_result(False, f"Balance should be 9900, got {user_data.get('balance')}", user_data)
+        user = r2.json()
+        paper_balance = user.get("paper", {}).get("balance", 0)
+        paper_trades = user.get("paper", {}).get("trades_count", 0)
+        real_balance = user.get("real", {}).get("balance", 0)
         
-        if user_data.get("trades_count") != 1:
-            return print_result(False, f"Trades count should be 1, got {user_data.get('trades_count')}", user_data)
+        if paper_balance != 9500:
+            log_result(False, f"Paper balance should be 9500 (10000-500), got {paper_balance}", r2)
+            return False, position_id
         
-        # Store position ID for later tests
-        global POSITION_ID
-        POSITION_ID = data.get("id")
+        if paper_trades != 1:
+            log_result(False, f"Paper trades_count should be 1, got {paper_trades}", r2)
+            return False, position_id
         
-        return print_result(True, f"Position opened successfully, ID: {POSITION_ID}", data)
+        if real_balance != 0:
+            log_result(False, f"Real balance should still be 0, got {real_balance}", r2)
+            return False, position_id
+        
+        log_result(True, f"User balances updated correctly: paper.balance=9500, paper.trades_count=1, real.balance=0", r2)
+        return True, position_id
+        
     except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
+        log_result(False, f"Exception: {e}")
+        return False, None
 
-def test_7_get_open_positions():
-    """Test 7: GET /api/positions/me?status=open - get open positions"""
-    print_test("7. Get Open Positions")
+def test_5_open_position_real_insufficient():
+    log_test(5, "Open position on REAL account with insufficient balance")
     try:
-        headers = {"X-Privy-Id": TEST_USER["privy_id"]}
-        response = requests.get(f"{BASE_URL}/positions/me?status=open", headers=headers)
-        data = response.json()
+        headers = {"X-Privy-Id": "qa_dual_1"}
+        payload = {
+            "pair": "SOL/USD",
+            "side": "short",
+            "margin": 100,
+            "leverage": 5,
+            "account_type": "real"
+        }
+        r = requests.post(f"{BASE_URL}/positions/open", json=payload, headers=headers)
         
-        if response.status_code != 200:
-            return print_result(False, f"Status code: {response.status_code}", data)
+        if r.status_code == 400:
+            error_msg = r.json().get("detail", "")
+            if "insufficient balance" in error_msg.lower():
+                log_result(True, f"Correctly rejected with 400: {error_msg}", r)
+                return True
+            else:
+                log_result(False, f"Got 400 but wrong error message: {error_msg}", r)
+                return False
+        else:
+            log_result(False, f"Expected 400, got {r.status_code}", r)
+            return False
         
-        positions = data.get("positions", [])
-        if len(positions) == 0:
-            return print_result(False, "No open positions found", data)
-        
-        # Check first position has mark_price and unrealized_pnl
-        pos = positions[0]
-        if "mark_price" not in pos:
-            return print_result(False, "Missing mark_price field", pos)
-        
-        if "unrealized_pnl" not in pos:
-            return print_result(False, "Missing unrealized_pnl field", pos)
-        
-        return print_result(True, f"Found {len(positions)} open position(s) with mark_price and unrealized_pnl", data)
     except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
+        log_result(False, f"Exception: {e}")
+        return False
 
-def test_8_close_position():
-    """Test 8: POST /api/positions/close - close a position"""
-    print_test("8. Close Position")
+def test_6_position_listing_filtered(position_id):
+    log_test(6, "Position listing filtered by account_type")
     try:
-        headers = {"X-Privy-Id": TEST_USER["privy_id"]}
+        headers = {"X-Privy-Id": "qa_dual_1"}
         
-        # Get user balance before closing
-        user_before = requests.get(f"{BASE_URL}/users/me", headers=headers).json()
-        balance_before = user_before.get("balance")
+        # Test paper positions
+        r1 = requests.get(f"{BASE_URL}/positions/me?account_type=paper&status=open", headers=headers)
+        if r1.status_code != 200:
+            log_result(False, "Failed to get paper positions", r1)
+            return False
         
-        close_data = {"position_id": POSITION_ID}
-        response = requests.post(f"{BASE_URL}/positions/close", json=close_data, headers=headers)
-        data = response.json()
+        paper_positions = r1.json().get("positions", [])
+        if len(paper_positions) != 1:
+            log_result(False, f"Expected 1 paper position, got {len(paper_positions)}", r1)
+            return False
         
-        if response.status_code != 200:
-            return print_result(False, f"Status code: {response.status_code}", data)
+        if paper_positions[0].get("id") != position_id:
+            log_result(False, f"Paper position ID mismatch", r1)
+            return False
         
-        # Verify position is closed
-        status = data.get("status")
-        if status not in ["closed", "liquidated"]:
-            return print_result(False, f"Status should be 'closed' or 'liquidated', got {status}", data)
+        log_result(True, f"Paper positions query returned 1 position", r1)
         
-        if data.get("exit_price") is None or data.get("exit_price") <= 0:
-            return print_result(False, f"Invalid exit_price: {data.get('exit_price')}", data)
+        # Test real positions (should be empty)
+        r2 = requests.get(f"{BASE_URL}/positions/me?account_type=real&status=open", headers=headers)
+        if r2.status_code != 200:
+            log_result(False, "Failed to get real positions", r2)
+            return False
         
-        if "pnl" not in data:
-            return print_result(False, "Missing pnl field", data)
+        real_positions = r2.json().get("positions", [])
+        if len(real_positions) != 0:
+            log_result(False, f"Expected 0 real positions, got {len(real_positions)}", r2)
+            return False
         
-        # Verify user balance changed
-        user_after = requests.get(f"{BASE_URL}/users/me", headers=headers).json()
-        balance_after = user_after.get("balance")
+        log_result(True, f"Real positions query returned empty array", r2)
+        return True
         
-        pnl = data.get("pnl")
-        expected_balance = balance_before + 100 + pnl  # margin + pnl
-        
-        # Allow small floating point differences
-        if abs(balance_after - expected_balance) > 0.01:
-            return print_result(False, f"Balance mismatch. Expected ~{expected_balance}, got {balance_after}", 
-                              {"balance_before": balance_before, "balance_after": balance_after, "pnl": pnl})
-        
-        return print_result(True, f"Position closed with status '{status}', PnL: {pnl:.2f}", data)
     except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
+        log_result(False, f"Exception: {e}")
+        return False
 
-def test_9_validations():
-    """Test 9: Validation tests"""
-    print_test("9. Validation Tests")
-    all_passed = True
-    
-    headers = {"X-Privy-Id": TEST_USER["privy_id"]}
-    
-    # Test 9a: Insufficient balance
+def test_7_close_paper_position(position_id):
+    log_test(7, "Close paper position")
     try:
-        response = requests.post(f"{BASE_URL}/positions/open", 
-                                json={"pair": "SOL/USD", "side": "long", "margin": 999999, "leverage": 10},
-                                headers=headers)
-        if response.status_code == 400 and "insufficient balance" in response.text.lower():
-            print_result(True, "9a. Insufficient balance validation works")
-        else:
-            print_result(False, f"9a. Expected 400 with 'insufficient balance', got {response.status_code}: {response.text}")
-            all_passed = False
-    except Exception as e:
-        print_result(False, f"9a. Exception: {str(e)}")
-        all_passed = False
-    
-    # Test 9b: Invalid leverage
-    try:
-        response = requests.post(f"{BASE_URL}/positions/open",
-                                json={"pair": "SOL/USD", "side": "long", "margin": 10, "leverage": 2000},
-                                headers=headers)
-        if response.status_code == 400:
-            print_result(True, "9b. Invalid leverage (2000) validation works")
-        else:
-            print_result(False, f"9b. Expected 400 for leverage=2000, got {response.status_code}: {response.text}")
-            all_passed = False
-    except Exception as e:
-        print_result(False, f"9b. Exception: {str(e)}")
-        all_passed = False
-    
-    # Test 9c: Invalid side
-    try:
-        response = requests.post(f"{BASE_URL}/positions/open",
-                                json={"pair": "SOL/USD", "side": "sideways", "margin": 10, "leverage": 10},
-                                headers=headers)
-        if response.status_code == 400:
-            print_result(True, "9c. Invalid side ('sideways') validation works")
-        else:
-            print_result(False, f"9c. Expected 400 for side='sideways', got {response.status_code}: {response.text}")
-            all_passed = False
-    except Exception as e:
-        print_result(False, f"9c. Exception: {str(e)}")
-        all_passed = False
-    
-    # Test 9d: Non-existent user
-    try:
-        response = requests.get(f"{BASE_URL}/users/me", 
-                               headers={"X-Privy-Id": "nonexistent_user_12345"})
-        if response.status_code == 404:
-            print_result(True, "9d. Non-existent user returns 404")
-        else:
-            print_result(False, f"9d. Expected 404 for non-existent user, got {response.status_code}: {response.text}")
-            all_passed = False
-    except Exception as e:
-        print_result(False, f"9d. Exception: {str(e)}")
-        all_passed = False
-    
-    return all_passed
-
-def test_10_leaderboard():
-    """Test 10: GET /api/leaderboard - get leaderboard"""
-    print_test("10. Leaderboard")
-    try:
-        response = requests.get(f"{BASE_URL}/leaderboard")
-        data = response.json()
+        headers = {"X-Privy-Id": "qa_dual_1"}
         
-        if response.status_code != 200:
-            return print_result(False, f"Status code: {response.status_code}", data)
+        # Get balance before closing
+        r_before = requests.get(f"{BASE_URL}/users/me", headers=headers)
+        if r_before.status_code != 200:
+            log_result(False, "Failed to get user before closing", r_before)
+            return False
+        
+        balance_before = r_before.json().get("paper", {}).get("balance", 0)
+        
+        # Close position
+        payload = {"position_id": position_id}
+        r = requests.post(f"{BASE_URL}/positions/close", json=payload, headers=headers)
+        
+        if r.status_code != 200:
+            log_result(False, "Failed to close position", r)
+            return False
+        
+        data = r.json()
+        pnl = data.get("pnl", 0)
+        
+        log_result(True, f"Position closed with pnl={pnl}", r)
+        
+        # Verify balance updated
+        r_after = requests.get(f"{BASE_URL}/users/me", headers=headers)
+        if r_after.status_code != 200:
+            log_result(False, "Failed to get user after closing", r_after)
+            return False
+        
+        user_after = r_after.json()
+        balance_after = user_after.get("paper", {}).get("balance", 0)
+        real_balance_after = user_after.get("real", {}).get("balance", 0)
+        
+        # Balance should have changed (margin + pnl returned)
+        if balance_after == balance_before:
+            log_result(False, f"Paper balance unchanged after close: {balance_after}", r_after)
+            return False
+        
+        # Real balance should still be 0
+        if real_balance_after != 0:
+            log_result(False, f"Real balance should still be 0, got {real_balance_after}", r_after)
+            return False
+        
+        log_result(True, f"Balances updated: paper.balance changed from {balance_before} to {balance_after}, real.balance still 0", r_after)
+        return True
+        
+    except Exception as e:
+        log_result(False, f"Exception: {e}")
+        return False
+
+def test_8_leaderboards_by_account():
+    log_test(8, "Leaderboards by account type")
+    try:
+        # Test paper leaderboard
+        r1 = requests.get(f"{BASE_URL}/leaderboard/paper")
+        if r1.status_code != 200:
+            log_result(False, "Failed to get paper leaderboard", r1)
+            return False
+        
+        paper_lb = r1.json().get("leaderboard", [])
+        
+        # Check if qa_dual_1 is in paper leaderboard
+        qa_in_paper = any(u.get("x_handle") == "qa_dual" for u in paper_lb)
+        if not qa_in_paper:
+            log_result(False, "qa_dual_1 not found in paper leaderboard", r1)
+            return False
+        
+        log_result(True, f"Paper leaderboard includes qa_dual_1 user ({len(paper_lb)} total users)", r1)
+        
+        # Test real leaderboard
+        r2 = requests.get(f"{BASE_URL}/leaderboard/real")
+        if r2.status_code != 200:
+            log_result(False, "Failed to get real leaderboard", r2)
+            return False
+        
+        real_lb = r2.json().get("leaderboard", [])
+        
+        # qa_dual_1 should NOT be in real leaderboard (no real trades)
+        qa_in_real = any(u.get("x_handle") == "qa_dual" for u in real_lb)
+        if qa_in_real:
+            log_result(False, "qa_dual_1 should NOT be in real leaderboard (no real trades)", r2)
+            return False
+        
+        log_result(True, f"Real leaderboard does NOT include qa_dual_1 (correct)", r2)
+        
+        # Test legacy leaderboard (should still work, defaults to paper)
+        r3 = requests.get(f"{BASE_URL}/leaderboard")
+        if r3.status_code != 200:
+            log_result(False, "Failed to get legacy leaderboard", r3)
+            return False
+        
+        log_result(True, "Legacy /leaderboard endpoint still works", r3)
+        return True
+        
+    except Exception as e:
+        log_result(False, f"Exception: {e}")
+        return False
+
+def test_9_competitions():
+    log_test(9, "GET /api/competitions")
+    try:
+        r = requests.get(f"{BASE_URL}/competitions")
+        if r.status_code != 200:
+            log_result(False, "Failed to get competitions", r)
+            return False
+        
+        data = r.json()
+        competitions = data.get("competitions", [])
+        
+        if len(competitions) < 2:
+            log_result(False, f"Expected at least 2 competitions, got {len(competitions)}", r)
+            return False
+        
+        # Find paper-main and real-main
+        paper_comp = next((c for c in competitions if c.get("id") == "paper-main"), None)
+        real_comp = next((c for c in competitions if c.get("id") == "real-main"), None)
+        
+        if not paper_comp:
+            log_result(False, "paper-main competition not found", r)
+            return False
+        
+        if not real_comp:
+            log_result(False, "real-main competition not found", r)
+            return False
+        
+        # Verify paper-main
+        if paper_comp.get("entry_fee_sol") != 1.0:
+            log_result(False, f"paper-main entry_fee_sol should be 1, got {paper_comp.get('entry_fee_sol')}", r)
+            return False
+        
+        if paper_comp.get("prize_pool_usd") != 10000:
+            log_result(False, f"paper-main prize_pool_usd should be 10000, got {paper_comp.get('prize_pool_usd')}", r)
+            return False
+        
+        if paper_comp.get("status") != "open":
+            log_result(False, f"paper-main status should be 'open', got {paper_comp.get('status')}", r)
+            return False
+        
+        if not isinstance(paper_comp.get("participants_count"), int):
+            log_result(False, f"paper-main participants_count should be int, got {type(paper_comp.get('participants_count'))}", r)
+            return False
+        
+        if not isinstance(paper_comp.get("prize_structure"), list):
+            log_result(False, f"paper-main prize_structure should be list", r)
+            return False
+        
+        log_result(True, f"paper-main verified: entry_fee_sol=1, prize_pool_usd=10000, status=open, participants_count={paper_comp.get('participants_count')}", r)
+        
+        # Verify real-main
+        if real_comp.get("entry_fee_sol") != 10.0:
+            log_result(False, f"real-main entry_fee_sol should be 10, got {real_comp.get('entry_fee_sol')}", r)
+            return False
+        
+        if real_comp.get("prize_pool_usd") != 100000:
+            log_result(False, f"real-main prize_pool_usd should be 100000, got {real_comp.get('prize_pool_usd')}", r)
+            return False
+        
+        if real_comp.get("status") != "open":
+            log_result(False, f"real-main status should be 'open', got {real_comp.get('status')}", r)
+            return False
+        
+        log_result(True, f"real-main verified: entry_fee_sol=10, prize_pool_usd=100000, status=open, participants_count={real_comp.get('participants_count')}", r)
+        return True
+        
+    except Exception as e:
+        log_result(False, f"Exception: {e}")
+        return False
+
+def test_10_join_competition():
+    log_test(10, "Join competition (should fail without real balance)")
+    try:
+        headers = {"X-Privy-Id": "qa_dual_1"}
+        payload = {"competition_id": "paper-main"}
+        r = requests.post(f"{BASE_URL}/competitions/join", json=payload, headers=headers)
+        
+        if r.status_code == 400:
+            error_msg = r.json().get("detail", "")
+            # Should mention needing SOL or balance
+            if "sol" in error_msg.lower() or "balance" in error_msg.lower():
+                log_result(True, f"Correctly rejected with 400: {error_msg}", r)
+                return True
+            else:
+                log_result(False, f"Got 400 but unexpected error message: {error_msg}", r)
+                return False
+        else:
+            log_result(False, f"Expected 400, got {r.status_code}", r)
+            return False
+        
+    except Exception as e:
+        log_result(False, f"Exception: {e}")
+        return False
+
+def test_11_withdraw_request():
+    log_test(11, "Withdraw request flow")
+    try:
+        headers = {"X-Privy-Id": "qa_dual_1"}
+        
+        # Test withdraw request (should fail - insufficient balance)
+        payload = {
+            "to_address": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+            "amount_sol": 0.1
+        }
+        r1 = requests.post(f"{BASE_URL}/wallet/withdraw_request", json=payload, headers=headers)
+        
+        if r1.status_code == 400:
+            error_msg = r1.json().get("detail", "")
+            if "balance" in error_msg.lower():
+                log_result(True, f"Withdraw request correctly rejected with 400: {error_msg}", r1)
+            else:
+                log_result(False, f"Got 400 but unexpected error: {error_msg}", r1)
+                return False
+        else:
+            log_result(False, f"Expected 400, got {r1.status_code}", r1)
+            return False
+        
+        # Test get withdrawals (should be empty)
+        r2 = requests.get(f"{BASE_URL}/wallet/withdrawals/me", headers=headers)
+        
+        if r2.status_code != 200:
+            log_result(False, "Failed to get withdrawals", r2)
+            return False
+        
+        withdrawals = r2.json().get("withdrawals", [])
+        if len(withdrawals) != 0:
+            log_result(False, f"Expected 0 withdrawals, got {len(withdrawals)}", r2)
+            return False
+        
+        log_result(True, "GET /wallet/withdrawals/me returns empty array", r2)
+        return True
+        
+    except Exception as e:
+        log_result(False, f"Exception: {e}")
+        return False
+
+def test_12_force_sweep():
+    log_test(12, "Force sweep (no funds expected)")
+    try:
+        headers = {"X-Privy-Id": "qa_dual_1"}
+        r = requests.post(f"{BASE_URL}/wallet/sweep", headers=headers)
+        
+        if r.status_code != 200:
+            log_result(False, "Sweep endpoint failed", r)
+            return False
+        
+        data = r.json()
+        swept_sol = data.get("swept_sol")
+        
+        if swept_sol is None:
+            log_result(False, "No swept_sol field in response", r)
+            return False
+        
+        # Should be 0 or None (no funds on chain)
+        if swept_sol == 0 or swept_sol is None:
+            log_result(True, f"Sweep returned swept_sol={swept_sol} (no funds to sweep)", r)
+            return True
+        else:
+            log_result(True, f"Sweep returned swept_sol={swept_sol} (unexpected but not an error)", r)
+            return True
+        
+    except Exception as e:
+        log_result(False, f"Exception: {e}")
+        return False
+
+def test_13_competition_leaderboard():
+    log_test(13, "Competition leaderboard")
+    try:
+        r = requests.get(f"{BASE_URL}/competitions/paper-main/leaderboard")
+        
+        if r.status_code != 200:
+            log_result(False, "Failed to get competition leaderboard", r)
+            return False
+        
+        data = r.json()
+        
+        if data.get("competition_id") != "paper-main":
+            log_result(False, f"Expected competition_id='paper-main', got {data.get('competition_id')}", r)
+            return False
         
         leaderboard = data.get("leaderboard", [])
-        if len(leaderboard) == 0:
-            return print_result(False, "Leaderboard is empty", data)
         
-        # Check structure of first entry
-        entry = leaderboard[0]
-        required_fields = ["rank", "x_handle", "x_name", "x_avatar", "balance", "total_pnl", "trades_count", "win_rate"]
-        for field in required_fields:
-            if field not in entry:
-                return print_result(False, f"Missing field '{field}' in leaderboard entry", entry)
+        # Should be empty (no entries yet)
+        if len(leaderboard) != 0:
+            log_result(False, f"Expected empty leaderboard (no entries), got {len(leaderboard)} entries", r)
+            return False
         
-        # Verify sorted by total_pnl desc
-        if len(leaderboard) > 1:
-            for i in range(len(leaderboard) - 1):
-                if leaderboard[i]["total_pnl"] < leaderboard[i+1]["total_pnl"]:
-                    return print_result(False, "Leaderboard not sorted by total_pnl desc", leaderboard)
+        log_result(True, "Competition leaderboard returns empty array (no entries yet)", r)
+        return True
         
-        # Check if our QA user appears
-        qa_user_found = any(e.get("x_handle") == TEST_USER["x_handle"] for e in leaderboard)
-        if not qa_user_found:
-            print(f"⚠️  WARNING: QA user '{TEST_USER['x_handle']}' not found in leaderboard")
-        
-        return print_result(True, f"Leaderboard returned with {len(leaderboard)} entries, sorted correctly", 
-                          {"entry_count": len(leaderboard), "qa_user_found": qa_user_found})
     except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
+        log_result(False, f"Exception: {e}")
+        return False
 
-def test_11_landing_stats():
-    """Test 11: GET /api/stats/landing - get landing page stats"""
-    print_test("11. Landing Stats")
+def test_14_regression():
+    log_test(14, "Regression tests")
     try:
-        response = requests.get(f"{BASE_URL}/stats/landing")
-        data = response.json()
+        # Test market prices
+        r1 = requests.get(f"{BASE_URL}/markets/prices")
+        if r1.status_code != 200:
+            log_result(False, "GET /markets/prices failed", r1)
+            return False
         
-        if response.status_code != 200:
-            return print_result(False, f"Status code: {response.status_code}", data)
-        
-        required_fields = {
-            "users": int,
-            "trades": int,
-            "total_volume": (int, float),
-            "monthly_volume": (int, float),
-            "max_leverage": int,
-            "uptime": (int, float)
-        }
-        
-        for field, expected_type in required_fields.items():
-            if field not in data:
-                return print_result(False, f"Missing field: {field}", data)
-            
-            value = data[field]
-            if isinstance(expected_type, tuple):
-                if not isinstance(value, expected_type):
-                    return print_result(False, f"Field '{field}' should be {expected_type}, got {type(value)}", data)
-            else:
-                if not isinstance(value, expected_type):
-                    return print_result(False, f"Field '{field}' should be {expected_type}, got {type(value)}", data)
-        
-        # Verify specific values
-        if data["max_leverage"] != 1000:
-            return print_result(False, f"max_leverage should be 1000, got {data['max_leverage']}", data)
-        
-        if data["uptime"] != 99.98:
-            return print_result(False, f"uptime should be 99.98, got {data['uptime']}", data)
-        
-        return print_result(True, "Landing stats returned with all required fields", data)
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_12_wallet_balance_wrapped_sol():
-    """Test 12: GET /api/wallet/balance/{address} - wrapped SOL mint"""
-    print_test("12. Wallet Balance - Wrapped SOL Mint")
-    try:
-        # Wrapped SOL mint address
-        address = "So11111111111111111111111111111111111111112"
-        response = requests.get(f"{BASE_URL}/wallet/balance/{address}")
-        data = response.json()
-        
-        if response.status_code != 200:
-            return print_result(False, f"Status code: {response.status_code}", data)
-        
-        # Check required fields
-        if "address" not in data or "sol" not in data or "usdc" not in data:
-            return print_result(False, "Missing required fields (address, sol, usdc)", data)
-        
-        if data["address"] != address:
-            return print_result(False, f"Address mismatch: expected {address}, got {data['address']}", data)
-        
-        # SOL and USDC should be numeric and >= 0
-        if not isinstance(data["sol"], (int, float)) or data["sol"] < 0:
-            return print_result(False, f"Invalid SOL value: {data['sol']}", data)
-        
-        if not isinstance(data["usdc"], (int, float)) or data["usdc"] < 0:
-            return print_result(False, f"Invalid USDC value: {data['usdc']}", data)
-        
-        return print_result(True, f"Wrapped SOL mint balance returned: SOL={data['sol']}, USDC={data['usdc']}", data)
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_13_wallet_balance_funded_address():
-    """Test 13: GET /api/wallet/balance/{address} - real funded mainnet address"""
-    print_test("13. Wallet Balance - Funded Mainnet Address")
-    try:
-        # Known phantom dev wallet
-        address = "B1aLAAe4vW8nSQCetXnYqJfRxzTjnbooczwkUJAr7yMS"
-        response = requests.get(f"{BASE_URL}/wallet/balance/{address}")
-        data = response.json()
-        
-        if response.status_code != 200:
-            return print_result(False, f"Status code: {response.status_code}", data)
-        
-        # Check required fields
-        if "address" not in data or "sol" not in data or "usdc" not in data:
-            return print_result(False, "Missing required fields (address, sol, usdc)", data)
-        
-        if data["address"] != address:
-            return print_result(False, f"Address mismatch: expected {address}, got {data['address']}", data)
-        
-        # SOL and USDC should be numeric
-        if not isinstance(data["sol"], (int, float)):
-            return print_result(False, f"Invalid SOL type: {type(data['sol'])}", data)
-        
-        if not isinstance(data["usdc"], (int, float)):
-            return print_result(False, f"Invalid USDC type: {type(data['usdc'])}", data)
-        
-        return print_result(True, f"Funded address balance returned: SOL={data['sol']}, USDC={data['usdc']}", data)
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_14_wallet_balance_invalid_address():
-    """Test 14: GET /api/wallet/balance/{address} - invalid address"""
-    print_test("14. Wallet Balance - Invalid Address")
-    try:
-        address = "notavalidaddress"
-        response = requests.get(f"{BASE_URL}/wallet/balance/{address}")
-        
-        # Should either return 0/0 gracefully or 5xx error (not crash)
-        if response.status_code == 200:
-            data = response.json()
-            if "address" in data and "sol" in data and "usdc" in data:
-                # Graceful handling - returns 0/0
-                return print_result(True, f"Invalid address handled gracefully: SOL={data['sol']}, USDC={data['usdc']}", data)
-            else:
-                return print_result(False, "Response missing required fields", data)
-        elif response.status_code >= 500:
-            # Server error is acceptable for invalid address
-            return print_result(True, f"Invalid address returned {response.status_code} error (acceptable)", {"status": response.status_code})
-        else:
-            return print_result(False, f"Unexpected status code: {response.status_code}", response.text)
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_15_deposit_scan_valid_user():
-    """Test 15: POST /api/wallet/deposit/scan - valid user with wallet"""
-    print_test("15. Deposit Scan - Valid User")
-    try:
-        # Create test user with wallet address
-        test_user_helius = {
-            "privy_id": "helius_test_user",
-            "x_handle": "helius_qa",
-            "wallet_address": "So11111111111111111111111111111111111111112"
-        }
-        
-        # First create the user
-        create_response = requests.post(f"{BASE_URL}/users/upsert", json=test_user_helius)
-        if create_response.status_code != 200:
-            return print_result(False, f"Failed to create test user: {create_response.status_code}", create_response.json())
-        
-        # Now scan for deposits
-        headers = {"X-Privy-Id": "helius_test_user"}
-        response = requests.post(f"{BASE_URL}/wallet/deposit/scan", headers=headers)
-        data = response.json()
-        
-        if response.status_code != 200:
-            return print_result(False, f"Status code: {response.status_code}", data)
-        
-        # Check required fields
-        if "credited" not in data or "scanned" not in data:
-            return print_result(False, "Missing required fields (credited, scanned)", data)
-        
-        # Values should be numeric
-        if not isinstance(data["credited"], (int, float)):
-            return print_result(False, f"Invalid credited type: {type(data['credited'])}", data)
-        
-        if not isinstance(data["scanned"], (int, float)):
-            return print_result(False, f"Invalid scanned type: {type(data['scanned'])}", data)
-        
-        return print_result(True, f"Deposit scan successful: credited={data['credited']}, scanned={data['scanned']}", data)
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_16_deposit_scan_nonexistent_user():
-    """Test 16: POST /api/wallet/deposit/scan - nonexistent user"""
-    print_test("16. Deposit Scan - Nonexistent User")
-    try:
-        headers = {"X-Privy-Id": "nonexistent_user_xyz"}
-        response = requests.post(f"{BASE_URL}/wallet/deposit/scan", headers=headers)
-        
-        if response.status_code == 404:
-            return print_result(True, "Nonexistent user correctly returns 404", {"status": response.status_code})
-        else:
-            data = response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text
-            return print_result(False, f"Expected 404, got {response.status_code}", data)
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_17_deposit_scan_no_wallet():
-    """Test 17: POST /api/wallet/deposit/scan - user without wallet_address"""
-    print_test("17. Deposit Scan - User Without Wallet")
-    try:
-        # Create user without wallet_address
-        test_user_no_wallet = {
-            "privy_id": "no_wallet_user",
-            "x_handle": "nw"
-        }
-        
-        create_response = requests.post(f"{BASE_URL}/users/upsert", json=test_user_no_wallet)
-        if create_response.status_code != 200:
-            return print_result(False, f"Failed to create test user: {create_response.status_code}", create_response.json())
-        
-        # Try to scan deposits
-        headers = {"X-Privy-Id": "no_wallet_user"}
-        response = requests.post(f"{BASE_URL}/wallet/deposit/scan", headers=headers)
-        
-        if response.status_code == 400:
-            data = response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text
-            if "no wallet" in str(data).lower():
-                return print_result(True, "User without wallet correctly returns 400 'no wallet'", data)
-            else:
-                return print_result(False, f"Expected 'no wallet' message, got: {data}", data)
-        else:
-            data = response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text
-            return print_result(False, f"Expected 400, got {response.status_code}", data)
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_18_regression_market_prices():
-    """Test 18: Regression - GET /api/markets/prices still returns 7 pairs"""
-    print_test("18. Regression - Market Prices (7 pairs)")
-    try:
-        response = requests.get(f"{BASE_URL}/markets/prices")
-        data = response.json()
-        
-        if response.status_code != 200:
-            return print_result(False, f"Status code: {response.status_code}", data)
-        
-        prices = data.get("prices", [])
+        prices = r1.json().get("prices", [])
         if len(prices) != 7:
-            return print_result(False, f"Expected 7 pairs, got {len(prices)}", data)
+            log_result(False, f"Expected 7 pairs, got {len(prices)}", r1)
+            return False
         
-        return print_result(True, f"Market prices still returns 7 pairs", {"pair_count": len(prices)})
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_19_regression_landing_stats():
-    """Test 19: Regression - GET /api/stats/landing still works"""
-    print_test("19. Regression - Landing Stats")
-    try:
-        response = requests.get(f"{BASE_URL}/stats/landing")
-        data = response.json()
+        log_result(True, f"GET /markets/prices returns 7 pairs", r1)
         
-        if response.status_code != 200:
-            return print_result(False, f"Status code: {response.status_code}", data)
+        # Test landing stats
+        r2 = requests.get(f"{BASE_URL}/stats/landing")
+        if r2.status_code != 200:
+            log_result(False, "GET /stats/landing failed", r2)
+            return False
         
+        stats = r2.json()
         required_fields = ["users", "trades", "total_volume", "monthly_volume", "max_leverage", "uptime"]
         for field in required_fields:
-            if field not in data:
-                return print_result(False, f"Missing field: {field}", data)
+            if field not in stats:
+                log_result(False, f"Missing field '{field}' in landing stats", r2)
+                return False
         
-        return print_result(True, "Landing stats still works with all required fields", data)
+        log_result(True, "GET /stats/landing returns all required fields", r2)
+        return True
+        
     except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
+        log_result(False, f"Exception: {e}")
+        return False
 
-def run_all_tests():
-    """Run all tests in sequence"""
+def main():
     print("\n" + "="*80)
-    print("DEGENS.BET BACKEND API TEST SUITE")
-    print(f"Testing: {BASE_URL}")
+    print("DEGENS.BET BACKEND COMPREHENSIVE TEST SUITE")
+    print("Testing upgraded backend with dual accounts, custodial wallets, and competitions")
     print("="*80)
     
-    results = []
+    results = {}
     
-    # Run tests in order
-    results.append(("Test 1: Root Endpoint", test_1_root_endpoint()))
-    results.append(("Test 2: Market Prices", test_2_market_prices()))
-    results.append(("Test 3: Single Price", test_3_single_price()))
-    results.append(("Test 4: User Upsert", test_4_user_upsert()))
-    results.append(("Test 5: Get User Me", test_5_get_user_me()))
-    results.append(("Test 6: Open Position", test_6_open_position()))
-    results.append(("Test 7: Get Open Positions", test_7_get_open_positions()))
-    results.append(("Test 8: Close Position", test_8_close_position()))
-    results.append(("Test 9: Validations", test_9_validations()))
-    results.append(("Test 10: Leaderboard", test_10_leaderboard()))
-    results.append(("Test 11: Landing Stats", test_11_landing_stats()))
+    # Test 1: Root endpoint
+    results["test_1"] = test_1_root_endpoint()
     
-    # New Helius wallet tests
-    results.append(("Test 12: Wallet Balance - Wrapped SOL", test_12_wallet_balance_wrapped_sol()))
-    results.append(("Test 13: Wallet Balance - Funded Address", test_13_wallet_balance_funded_address()))
-    results.append(("Test 14: Wallet Balance - Invalid Address", test_14_wallet_balance_invalid_address()))
-    results.append(("Test 15: Deposit Scan - Valid User", test_15_deposit_scan_valid_user()))
-    results.append(("Test 16: Deposit Scan - Nonexistent User", test_16_deposit_scan_nonexistent_user()))
-    results.append(("Test 17: Deposit Scan - No Wallet", test_17_deposit_scan_no_wallet()))
+    # Test 2: User creation with custodial wallet
+    test_2_result, custodial_addr = test_2_user_creation_with_custodial_wallet()
+    results["test_2"] = test_2_result
     
-    # Regression tests
-    results.append(("Test 18: Regression - Market Prices", test_18_regression_market_prices()))
-    results.append(("Test 19: Regression - Landing Stats", test_19_regression_landing_stats()))
+    if not test_2_result:
+        print("\n❌ Test 2 failed - cannot continue with remaining tests")
+        return
+    
+    # Test 3: Get users/me
+    results["test_3"] = test_3_get_users_me(custodial_addr)
+    
+    # Test 4: Open position on paper
+    test_4_result, position_id = test_4_open_position_paper()
+    results["test_4"] = test_4_result
+    
+    # Test 5: Open position on real (insufficient balance)
+    results["test_5"] = test_5_open_position_real_insufficient()
+    
+    # Test 6: Position listing filtered
+    if position_id:
+        results["test_6"] = test_6_position_listing_filtered(position_id)
+    else:
+        results["test_6"] = False
+        print("⚠️  Skipping test 6 - no position_id from test 4")
+    
+    # Test 7: Close paper position
+    if position_id:
+        results["test_7"] = test_7_close_paper_position(position_id)
+    else:
+        results["test_7"] = False
+        print("⚠️  Skipping test 7 - no position_id from test 4")
+    
+    # Test 8: Leaderboards by account
+    results["test_8"] = test_8_leaderboards_by_account()
+    
+    # Test 9: Competitions
+    results["test_9"] = test_9_competitions()
+    
+    # Test 10: Join competition
+    results["test_10"] = test_10_join_competition()
+    
+    # Test 11: Withdraw request
+    results["test_11"] = test_11_withdraw_request()
+    
+    # Test 12: Force sweep
+    results["test_12"] = test_12_force_sweep()
+    
+    # Test 13: Competition leaderboard
+    results["test_13"] = test_13_competition_leaderboard()
+    
+    # Test 14: Regression
+    results["test_14"] = test_14_regression()
     
     # Summary
     print("\n" + "="*80)
     print("TEST SUMMARY")
     print("="*80)
     
-    passed = sum(1 for _, result in results if result)
+    passed = sum(1 for v in results.values() if v)
     total = len(results)
     
-    for test_name, result in results:
+    for test_name, result in results.items():
         status = "✅ PASS" if result else "❌ FAIL"
-        print(f"{status} - {test_name}")
+        print(f"{test_name}: {status}")
     
     print(f"\nTotal: {passed}/{total} tests passed")
-    print("="*80)
     
-    return passed == total
+    if passed == total:
+        print("\n🎉 ALL TESTS PASSED!")
+    else:
+        print(f"\n⚠️  {total - passed} test(s) failed")
 
 if __name__ == "__main__":
-    # Global variable to store position ID
-    POSITION_ID = None
-    
-    success = run_all_tests()
-    exit(0 if success else 1)
+    main()

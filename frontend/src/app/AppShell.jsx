@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { usePrivy } from '@privy-io/react-auth';
 import { useAppUser } from './UserSync';
-import { LayoutDashboard, TrendingUp, Trophy, Wallet, LogOut, Copy, Check } from 'lucide-react';
-import PixelLogo from '../components/PixelLogo';
+import { useAccount } from './AccountContext';
+import { LayoutDashboard, TrendingUp, Trophy, Wallet, LogOut, Copy, Check, Swords } from 'lucide-react';
 import { fmtUsd } from '../lib/api';
 
 const nav = [
   { to: '/app', icon: LayoutDashboard, label: 'DASHBOARD', end: true },
   { to: '/app/trade', icon: TrendingUp, label: 'TRADE' },
+  { to: '/app/competitions', icon: Swords, label: 'COMPETITIONS' },
   { to: '/app/leaderboard', icon: Trophy, label: 'LEADERBOARD' },
   { to: '/app/wallet', icon: Wallet, label: 'WALLET' },
 ];
@@ -16,16 +18,18 @@ const nav = [
 export default function AppShell({ children }) {
   const { logout, user } = usePrivy();
   const { dbUser } = useAppUser();
+  const { account, setAccount } = useAccount();
   const loc = useLocation();
   const nav2 = useNavigate();
   const [copied, setCopied] = useState(false);
 
   const tw = user?.twitter;
-  const wallet = dbUser?.wallet_address;
+  const addr = dbUser?.custodial_address;
+  const acct = dbUser?.[account] || { balance: 0, total_pnl: 0 };
 
   const copy = async () => {
-    if (!wallet) return;
-    await navigator.clipboard.writeText(wallet);
+    if (!addr) return;
+    await navigator.clipboard.writeText(addr);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -60,11 +64,11 @@ export default function AppShell({ children }) {
 
           <div className="mt-auto pt-6">
             <div className="pixel-card p-3">
-              <div className="font-pixel text-[7px] text-[#808080] mb-1">BALANCE</div>
-              <div className="font-pixel text-[14px] text-[#00FF29]">{fmtUsd(dbUser?.balance ?? 0)}</div>
-              <div className="font-pixel text-[7px] text-[#808080] mt-3">TOTAL PNL</div>
-              <div className={`font-pixel text-[11px] ${ (dbUser?.total_pnl ?? 0) >= 0 ? 'text-[#00FF29]' : 'text-[#ff3838]'}`}>
-                {fmtUsd(dbUser?.total_pnl ?? 0, { sign: true })}
+              <div className="font-pixel text-[7px] text-[#808080] mb-1">{account.toUpperCase()} BALANCE</div>
+              <div className="font-pixel text-[14px] text-[#00FF29]">{fmtUsd(acct.balance || 0)}</div>
+              <div className="font-pixel text-[7px] text-[#808080] mt-3">REALIZED PNL</div>
+              <div className={`font-pixel text-[11px] ${(acct.total_pnl || 0) >= 0 ? 'text-[#00FF29]' : 'text-[#ff3838]'}`}>
+                {fmtUsd(acct.total_pnl || 0, { sign: true })}
               </div>
             </div>
             <button onClick={() => { logout(); nav2('/'); }}
@@ -77,13 +81,31 @@ export default function AppShell({ children }) {
         {/* Main */}
         <main className="flex-1 min-w-0">
           {/* Topbar */}
-          <div className="border-b-2 border-[#1f1f1f] bg-[#0a0a0a] px-6 py-3 flex items-center justify-between gap-4">
-            <div className="font-pixel text-[9px] text-[#00FF29] flicker hidden sm:block">// MAINNET ONLINE</div>
+          <div className="border-b-2 border-[#1f1f1f] bg-[#0a0a0a] px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
+            {/* Account toggle */}
+            <div className="flex items-center gap-2">
+              <span className="font-pixel text-[8px] text-[#808080] mr-2">ACCOUNT</span>
+              <div className="flex border-2 border-[#1f1f1f] bg-[#0d0d0d]">
+                <button onClick={() => setAccount('paper')}
+                  className={`px-3 py-2 font-pixel text-[9px] ${account === 'paper'
+                    ? 'bg-[#00FF29] text-[#050505]'
+                    : 'text-[#808080] hover:text-white'}`}>
+                  PAPER
+                </button>
+                <button onClick={() => setAccount('real')}
+                  className={`px-3 py-2 font-pixel text-[9px] ${account === 'real'
+                    ? 'bg-[#ff3838] text-[#050505]'
+                    : 'text-[#808080] hover:text-white'}`}>
+                  REAL
+                </button>
+              </div>
+            </div>
+
             <div className="flex items-center gap-3 ml-auto">
-              {wallet && (
+              {addr && (
                 <button onClick={copy} className="flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] border border-[#1f1f1f] hover:border-[#00FF29] transition-colors">
-                  <span className="font-pixel text-[8px] text-[#808080]">WALLET</span>
-                  <span className="font-mono text-[14px] text-white">{wallet.slice(0,4)}...{wallet.slice(-4)}</span>
+                  <span className="font-pixel text-[8px] text-[#808080]">DEPOSIT</span>
+                  <span className="font-mono text-[14px] text-white">{addr.slice(0,4)}...{addr.slice(-4)}</span>
                   {copied ? <Check size={12} className="text-[#00FF29]" /> : <Copy size={12} className="text-[#808080]" />}
                 </button>
               )}

@@ -1,12 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAppUser } from './UserSync';
+import { useAccount } from './AccountContext';
 import { usePrices } from './PricesProvider';
 import { api, PAIRS, fmtUsd, formatPrice } from '../lib/api';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 export default function TradeView() {
   const { dbUser, refresh } = useAppUser();
+  const { account } = useAccount();
   const { prices } = usePrices();
   const [params, setParams] = useSearchParams();
   const [pair, setPair] = useState(params.get('pair') || 'SOL/USD');
@@ -17,30 +19,27 @@ export default function TradeView() {
   const [hist, setHist] = useState([]);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
-  const [history, setHistory] = useState([]); // price history for chart
+  const [history, setHistory] = useState([]);
 
+  const acct = dbUser?.[account] || { balance: 0 };
   const px = prices[pair];
 
-  // build a price history buffer per pair for sparkline
   useEffect(() => {
     if (!px) return;
     setHistory(h => {
       const lastTime = h.length ? h[h.length-1].t : 0;
       const t = Date.parse(px.updated_at);
       if (t === lastTime) return h;
-      const next = [...h, { t, p: px.price }];
-      return next.slice(-60);
+      return [...h, { t, p: px.price }].slice(-60);
     });
   }, [px?.updated_at, pair]);
-
-  // reset history on pair change
   useEffect(() => { setHistory([]); }, [pair]);
 
   const loadPositions = async () => {
     try {
-      const o = await api.get('/positions/me?status=open');
+      const o = await api.get(`/positions/me?account_type=${account}&status=open`);
       setOpenPos(o.data.positions);
-      const h = await api.get('/positions/me');
+      const h = await api.get(`/positions/me?account_type=${account}`);
       setHist(h.data.positions.filter(p => p.status !== 'open').slice(0, 10));
     } catch (e) { /* noop */ }
   };
@@ -48,12 +47,18 @@ export default function TradeView() {
     loadPositions();
     const id = setInterval(loadPositions, 5000);
     return () => clearInterval(id);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account]);
 
   const openTrade = async () => {
     setErr(''); setBusy(true);
     try {
-      await api.post('/positions/open', { pair, side, margin: Number(margin), leverage: Number(leverage) });
+      await api.post('/positions/open', {
+        pair, side,
+        margin: Number(margin),
+        leverage: Number(leverage),
+        account_type: account,
+      });
       await refresh();
       await loadPositions();
     } catch (e) {
@@ -72,16 +77,17 @@ export default function TradeView() {
     } finally { setBusy(false); }
   };
 
-  const switchPair = (p) => {
-    setPair(p);
-    setParams({ pair: p });
-  };
+  const switchPair = (p) => { setPair(p); setParams({ pair: p }); };
 
   return (
     <div className="space-y-4">
-      <div className="section-label">// TERMINAL.EXE</div>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="section-label">// TERMINAL.EXE</div>
+        <div className={`font-pixel text-[9px] px-3 py-2 border-2 ${account==='real' ? 'border-[#ff3838] text-[#ff3838]' : 'border-[#00FF29] text-[#00FF29]'}`}>
+          TRADING [{account.toUpperCase()}] · BAL {fmtUsd(acct.balance || 0)}
+        </div>
+      </div>
 
-      {/* Pair tabs */}
       <div className="flex gap-2 overflow-x-auto">
         {PAIRS.map(p => {
           const pr = prices[p];
@@ -102,27 +108,23 @@ export default function TradeView() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Chart */}
         <div className="lg:col-span-8 pixel-card p-4">
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div className="flex items-center gap-3">
               <div className="font-pixel text-[14px] text-white">{pair}</div>
-              {px && (
-                <>
-                  <div className="font-mono text-[20px] text-[#00FF29]">${formatPrice(px.price)}</div>
-                  <div className={`font-pixel text-[10px] flex items-center ${px.change_24h >= 0 ? 'text-[#00FF29]' : 'text-[#ff3838]'}`}>
-                    {px.change_24h >= 0 ? <ArrowUpRight size={12}/> : <ArrowDownRight size={12}/>}
-                    {px.change_24h.toFixed(2)}%
-                  </div>
-                </>
-              )}
+              {px && (<>
+                <div className="font-mono text-[20px] text-[#00FF29]">${formatPrice(px.price)}</div>
+                <div className={`font-pixel text-[10px] flex items-center ${px.change_24h >= 0 ? 'text-[#00FF29]' : 'text-[#ff3838]'}`}>
+                  {px.change_24h >= 0 ? <ArrowUpRight size={12}/> : <ArrowDownRight size={12}/>}
+                  {px.change_24h.toFixed(2)}%
+                </div>
+              </>)}
             </div>
             <div className="font-pixel text-[8px] text-[#808080]">LIVE · COINGECKO</div>
           </div>
           <PriceChart data={history} />
         </div>
 
-        {/* Order form */}
         <div className="lg:col-span-4 pixel-card p-4">
           <div className="grid grid-cols-2 gap-2 mb-4">
             <button onClick={() => setSide('long')}
@@ -142,7 +144,7 @@ export default function TradeView() {
               className="flex-1 bg-[#0d0d0d] border-2 border-[#1f1f1f] focus:border-[#00FF29] outline-none px-3 py-2 font-mono text-[16px] text-white" />
             <div className="flex gap-1">
               {[25, 50, 100].map(pct => (
-                <button key={pct} onClick={() => setMargin(Math.floor((dbUser?.balance || 0) * pct / 100))}
+                <button key={pct} onClick={() => setMargin(Math.floor((acct.balance || 0) * pct / 100))}
                   className="px-2 py-2 bg-[#0d0d0d] border border-[#1f1f1f] hover:border-[#00FF29] font-pixel text-[8px] text-[#808080]">{pct}%</button>
               ))}
             </div>
@@ -164,7 +166,7 @@ export default function TradeView() {
             <Row label="POSITION SIZE" value={fmtUsd(Number(margin) * Number(leverage))} />
             <Row label="ENTRY (EST)" value={px ? `$${formatPrice(px.price)}` : '-'} />
             <Row label="LIQ ESTIMATE" value={leverage > 1 ? `~${(100 / leverage).toFixed(2)}%` : '—'} />
-            <Row label="AVAIL" value={fmtUsd(dbUser?.balance || 0)} color="#00FF29" />
+            <Row label={`${account.toUpperCase()} AVAIL`} value={fmtUsd(acct.balance || 0)} color={account==='real'?'#ff3838':'#00FF29'} />
           </div>
 
           {err && <div className="font-pixel text-[9px] text-[#ff3838] mb-2">! {err.toUpperCase()}</div>}
@@ -179,7 +181,6 @@ export default function TradeView() {
         </div>
       </div>
 
-      {/* Open positions table */}
       <div className="pixel-card p-4">
         <div className="font-pixel text-[10px] text-[#00FF29] mb-3">// OPEN POSITIONS [{openPos.length}]</div>
         {openPos.length === 0 ? (
@@ -222,41 +223,6 @@ export default function TradeView() {
           </div>
         )}
       </div>
-
-      {/* Recent history */}
-      {hist.length > 0 && (
-        <div className="pixel-card p-4">
-          <div className="font-pixel text-[10px] text-[#00FF29] mb-3">// CLOSED [{hist.length}]</div>
-          <div className="overflow-x-auto">
-            <table className="w-full font-mono text-[14px]">
-              <thead>
-                <tr className="font-pixel text-[7px] text-[#808080] border-b border-[#1f1f1f]">
-                  <th className="text-left py-2">PAIR</th>
-                  <th>SIDE</th>
-                  <th className="text-right">ENTRY</th>
-                  <th className="text-right">EXIT</th>
-                  <th className="text-right">PNL</th>
-                  <th className="text-right">STATUS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {hist.map(p => (
-                  <tr key={p.id} className="border-b border-[#1f1f1f]/50">
-                    <td className="py-2 text-white">{p.pair}</td>
-                    <td className={p.side === 'long' ? 'text-[#00FF29]' : 'text-[#ff3838]'}>{p.side.toUpperCase()} {p.leverage}x</td>
-                    <td className="text-right text-[#808080]">{formatPrice(p.entry_price)}</td>
-                    <td className="text-right text-[#808080]">{formatPrice(p.exit_price)}</td>
-                    <td className={`text-right ${p.pnl >= 0 ? 'text-[#00FF29]' : 'text-[#ff3838]'}`}>{fmtUsd(p.pnl, { sign: true })}</td>
-                    <td className="text-right">
-                      <span className={`font-pixel text-[7px] px-2 py-1 ${p.status === 'liquidated' ? 'bg-[#ff3838] text-[#050505]' : 'bg-[#0d0d0d] text-[#00FF29] border border-[#1f1f1f]'}`}>{p.status.toUpperCase()}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

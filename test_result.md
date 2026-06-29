@@ -273,6 +273,162 @@ backend:
         agent: "testing"
         comment: "Helius RPC integration working correctly. HELIUS_RPC_URL configured in .env and successfully querying Solana mainnet for wallet balances (getBalance, getTokenAccountsByOwner) and transaction signatures (getSignaturesForAddress). All RPC calls executing without errors."
 
+  - task: "Dual account system (paper/real sub-accounts)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "UPGRADED BACKEND: Users now have nested paper and real sub-accounts. POST /api/users/upsert creates user with paper.balance=10000, paper.total_pnl=0, paper.trades_count=0, paper.wins=0 AND real.balance=0, real.total_pnl=0, real.trades_count=0, real.wins=0. Both sub-accounts working correctly. Test passed."
+
+  - task: "Custodial wallet auto-generation"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "UPGRADED BACKEND: Custodial Solana wallet auto-generated on user upsert. Field custodial_address is a valid Solana base58 address (32-44 chars). encrypted_privkey is NOT returned in API responses (security verified). Wallet generation is idempotent - calling upsert again preserves the same custodial_address. Test passed."
+
+  - task: "Positions with account_type (paper/real)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "UPGRADED BACKEND: POST /api/positions/open accepts account_type='paper' or 'real'. Opening position on paper account correctly debits paper.balance (10000->9500) and increments paper.trades_count (0->1), while real.balance remains 0. Attempting to open position on real account with insufficient balance correctly returns 400 'insufficient balance'. GET /api/positions/me?account_type=paper&status=open returns only paper positions. GET /api/positions/me?account_type=real&status=open returns empty array (no real positions). Account isolation working correctly. Test passed."
+
+  - task: "Close position with account-specific balance updates"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "UPGRADED BACKEND: POST /api/positions/close correctly updates the appropriate sub-account balance. Closing paper position returned margin+pnl to paper.balance (9500->10000), while real.balance remained 0. Account-specific balance updates working correctly. Test passed."
+
+  - task: "Leaderboards by account type (paper/real)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "UPGRADED BACKEND: GET /api/leaderboard/paper returns leaderboard for paper account (includes qa_dual_1 user with 1 paper trade). GET /api/leaderboard/real returns leaderboard for real account (empty, qa_dual_1 has no real trades). Legacy GET /api/leaderboard still works (defaults to paper for backward compatibility). All three endpoints working correctly. Test passed."
+
+  - task: "Competitions endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "UPGRADED BACKEND: GET /api/competitions returns 2 seeded competitions. paper-main: entry_fee_sol=1.0, prize_pool_usd=10000, status='open', participants_count=0 (int), prize_structure array present. real-main: entry_fee_sol=10.0, prize_pool_usd=100000, status='open', participants_count=0 (int), prize_structure array present. All fields verified. Test passed."
+
+  - task: "Join competition endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "UPGRADED BACKEND: POST /api/competitions/join correctly validates real balance before allowing entry. Attempting to join paper-main competition (1 SOL entry fee) with 0 real balance correctly returns 400 'need 1.0 SOL (~$73.34) in your real balance. Deposit first.' Entry fee validation working correctly. Test passed."
+
+  - task: "Competition leaderboard endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "UPGRADED BACKEND: GET /api/competitions/paper-main/leaderboard returns {leaderboard: [], competition_id: 'paper-main'}. Empty leaderboard is correct (no entries yet). Endpoint structure verified. Test passed."
+
+  - task: "Wallet sweep endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "UPGRADED BACKEND: POST /api/wallet/sweep with X-Privy-Id header returns {swept_sol: 0.0}. No funds on custodial wallet to sweep (expected). Endpoint working without errors. Test passed."
+
+  - task: "Withdraw request endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "UPGRADED BACKEND: POST /api/wallet/withdraw_request correctly validates real balance. Attempting to withdraw 0.1 SOL with 0 real balance correctly returns 400 'amount exceeds real balance'. Validation working correctly. Test passed."
+
+  - task: "User withdrawals endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "UPGRADED BACKEND: GET /api/wallet/withdrawals/me with X-Privy-Id header returns {withdrawals: []}. Empty array is correct (no withdrawal requests made). Endpoint working correctly. Test passed."
+
+  - task: "Regression - Market prices still working"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "UPGRADED BACKEND REGRESSION: GET /api/markets/prices still returns all 7 pairs (SOL/USD, BTC/USD, ETH/USD, BONK/USD, WIF/USD, JUP/USD, PEPE/USD) with correct structure. No regression. Test passed."
+
+  - task: "Regression - Landing stats still working"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "UPGRADED BACKEND REGRESSION: GET /api/stats/landing still returns all required fields (users, trades, total_volume, monthly_volume, max_leverage, uptime). No regression. Test passed."
+
 frontend:
   - task: "Frontend UI"
     implemented: true
@@ -288,14 +444,16 @@ frontend:
 
 metadata:
   created_by: "testing_agent"
-  version: "1.1"
-  test_sequence: 2
+  version: "1.2"
+  test_sequence: 3
   run_ui: false
 
 test_plan:
   current_focus:
-    - "Helius wallet endpoints tested and verified"
-    - "All backend API endpoints tested and verified"
+    - "UPGRADED BACKEND: Dual account system (paper/real) tested and verified"
+    - "UPGRADED BACKEND: Custodial wallets tested and verified"
+    - "UPGRADED BACKEND: Competitions system tested and verified"
+    - "UPGRADED BACKEND: All new endpoints tested and verified"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -305,3 +463,5 @@ agent_communication:
     message: "Completed comprehensive backend API testing. All 11 test scenarios passed successfully. Tested: root endpoint, market prices (all 7 pairs), single price lookup, user upsert (create & update without duplication), get current user, open position (with balance deduction), get open positions (with mark_price and unrealized_pnl), close position (with pnl calculation and balance update), all validation rules (insufficient balance, invalid leverage, invalid side, non-existent user), leaderboard (sorted by total_pnl), and landing stats. Backend is fully functional and ready for production."
   - agent: "testing"
     message: "Completed testing of new Helius wallet endpoints. All 8 new tests passed successfully: (1) GET /api/wallet/balance/{address} with wrapped SOL mint returns SOL=1558.44, USDC=3774.69, (2) with funded mainnet address returns SOL=0.00144768, USDC=0.0, (3) with invalid address gracefully returns SOL=0.0, USDC=0.0, (4) POST /api/wallet/deposit/scan with valid user returns credited=237540.43, scanned=25, (5) with nonexistent user correctly returns 404, (6) with user without wallet correctly returns 400 'no wallet', (7) Regression test confirms GET /api/markets/prices still returns 7 pairs, (8) Regression test confirms GET /api/stats/landing still works. Helius RPC integration is fully functional and querying Solana mainnet successfully."
+  - agent: "testing"
+    message: "🎉 UPGRADED BACKEND COMPREHENSIVE TEST COMPLETE - ALL 14 TESTS PASSED! Tested major upgrade with dual account system (paper/real sub-accounts), custodial wallet auto-generation, competitions, and new endpoints. VERIFIED: (1) Root endpoint working, (2) User creation with custodial wallet (paper.balance=10000, real.balance=0, custodial_address generated, encrypted_privkey NOT returned, idempotent), (3) GET /users/me returns both sub-accounts, (4) Open position on PAPER account (balance deducted from paper only), (5) Open position on REAL account correctly rejected (insufficient balance), (6) Position listing filtered by account_type (paper/real isolation), (7) Close paper position (balance returned to paper only), (8) Leaderboards by account type (paper/real separate, legacy works), (9) Competitions endpoint (paper-main: 1 SOL entry, $10k pool; real-main: 10 SOL entry, $100k pool), (10) Join competition correctly validates real balance, (11) Withdraw request flow (validation working, withdrawals empty), (12) Force sweep (returns 0 as expected), (13) Competition leaderboard (empty as expected), (14) Regression tests (7 pairs, landing stats). Backend upgrade is FULLY FUNCTIONAL and ready for production."

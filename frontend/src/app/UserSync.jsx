@@ -29,7 +29,7 @@ export default function UserSync({ children }) {
           x_handle: tw.username || null,
           x_name: tw.name || null,
           x_avatar: tw.profilePictureUrl || null,
-          wallet_address: wallet || null,
+          privy_wallet: wallet || null,
         });
         setDbUser(r2.data);
       }
@@ -50,7 +50,7 @@ export default function UserSync({ children }) {
             x_handle: tw.username || null,
             x_name: tw.name || null,
             x_avatar: tw.profilePictureUrl || null,
-            wallet_address: wallet || null,
+            privy_wallet: wallet || null,
           });
           setDbUser(r.data);
         } catch (e) {

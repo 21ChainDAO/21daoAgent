@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { api, fmtUsd } from '../lib/api';
+import { useAccount } from './AccountContext';
 import { Trophy, Crown } from 'lucide-react';
 
 export default function Leaderboard() {
+  const { account, setAccount } = useAccount();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
     const load = async () => {
+      setLoading(true);
       try {
-        const r = await api.get('/leaderboard');
+        const r = await api.get(`/leaderboard/${account}`);
         if (!alive) return;
         setRows(r.data.leaderboard);
       } finally { setLoading(false); }
@@ -18,14 +21,26 @@ export default function Leaderboard() {
     load();
     const id = setInterval(load, 10000);
     return () => { alive = false; clearInterval(id); };
-  }, []);
+  }, [account]);
 
   return (
     <div className="space-y-5">
       <div className="section-label">// LEADERBOARD.SYS</div>
-      <h1 className="font-pixel text-white text-[22px] flex items-center gap-3">
-        <Trophy className="text-[#00FF29]" /> GLOBAL RANKINGS
-      </h1>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <h1 className="font-pixel text-white text-[22px] flex items-center gap-3">
+          <Trophy className="text-[#00FF29]" /> GLOBAL RANKINGS
+        </h1>
+        <div className="flex border-2 border-[#1f1f1f] bg-[#0d0d0d]">
+          <button onClick={() => setAccount('paper')}
+            className={`px-5 py-2 font-pixel text-[9px] ${account === 'paper' ? 'bg-[#00FF29] text-[#050505]' : 'text-[#808080] hover:text-white'}`}>
+            PAPER
+          </button>
+          <button onClick={() => setAccount('real')}
+            className={`px-5 py-2 font-pixel text-[9px] ${account === 'real' ? 'bg-[#ff3838] text-[#050505]' : 'text-[#808080] hover:text-white'}`}>
+            REAL
+          </button>
+        </div>
+      </div>
 
       <div className="pixel-card p-0 overflow-hidden">
         <div className="grid grid-cols-12 font-pixel text-[8px] text-[#808080] px-4 py-3 border-b-2 border-[#1f1f1f] bg-[#0a0a0a]">
@@ -39,7 +54,9 @@ export default function Leaderboard() {
         {loading ? (
           <div className="py-12 text-center font-pixel text-[9px] text-[#808080]">LOADING...</div>
         ) : rows.length === 0 ? (
-          <div className="py-12 text-center font-pixel text-[9px] text-[#808080]">NO TRADERS YET // BE THE FIRST</div>
+          <div className="py-12 text-center font-pixel text-[9px] text-[#808080]">
+            NO {account.toUpperCase()} TRADERS YET // BE THE FIRST
+          </div>
         ) : rows.map((r) => (
           <div key={r.rank} className="grid grid-cols-12 items-center px-4 py-3 border-b border-[#1f1f1f]/60 hover:bg-[#0d0d0d]">
             <div className="col-span-1">

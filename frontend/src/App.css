@@ -1,0 +1,57 @@
+/* App-specific extras */
+.App { background: #050505; min-height: 100vh; }
+
+.tag-line {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #0d0d0d;
+  border: 1px solid #1f1f1f;
+  color: #00FF29;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+.section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  color: #00FF29;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+.section-label::before {
+  content: '';
+  width: 10px; height: 10px;
+  background: #00FF29;
+  box-shadow: 0 0 10px #00FF29;
+  display: inline-block;
+}
+
+.divider-pixel {
+  height: 2px;
+  background: repeating-linear-gradient(to right, #1f1f1f 0, #1f1f1f 8px, transparent 8px, transparent 16px);
+}
+
+/* Trading preview frame tilt */
+.tilt-right {
+  transform: perspective(1400px) rotateY(-6deg) rotateX(2deg);
+  transition: transform 600ms ease;
+}
+.tilt-right:hover {
+  transform: perspective(1400px) rotateY(-2deg) rotateX(0deg);
+}
+
+/* Marquee */
+.marquee {
+  display: flex;
+  gap: 48px;
+  white-space: nowrap;
+  animation: marquee 30s linear infinite;
+}
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}

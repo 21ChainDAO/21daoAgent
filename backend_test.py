@@ -430,6 +430,210 @@ def test_11_landing_stats():
     except Exception as e:
         return print_result(False, f"Exception: {str(e)}")
 
+def test_12_wallet_balance_wrapped_sol():
+    """Test 12: GET /api/wallet/balance/{address} - wrapped SOL mint"""
+    print_test("12. Wallet Balance - Wrapped SOL Mint")
+    try:
+        # Wrapped SOL mint address
+        address = "So11111111111111111111111111111111111111112"
+        response = requests.get(f"{BASE_URL}/wallet/balance/{address}")
+        data = response.json()
+        
+        if response.status_code != 200:
+            return print_result(False, f"Status code: {response.status_code}", data)
+        
+        # Check required fields
+        if "address" not in data or "sol" not in data or "usdc" not in data:
+            return print_result(False, "Missing required fields (address, sol, usdc)", data)
+        
+        if data["address"] != address:
+            return print_result(False, f"Address mismatch: expected {address}, got {data['address']}", data)
+        
+        # SOL and USDC should be numeric and >= 0
+        if not isinstance(data["sol"], (int, float)) or data["sol"] < 0:
+            return print_result(False, f"Invalid SOL value: {data['sol']}", data)
+        
+        if not isinstance(data["usdc"], (int, float)) or data["usdc"] < 0:
+            return print_result(False, f"Invalid USDC value: {data['usdc']}", data)
+        
+        return print_result(True, f"Wrapped SOL mint balance returned: SOL={data['sol']}, USDC={data['usdc']}", data)
+    except Exception as e:
+        return print_result(False, f"Exception: {str(e)}")
+
+def test_13_wallet_balance_funded_address():
+    """Test 13: GET /api/wallet/balance/{address} - real funded mainnet address"""
+    print_test("13. Wallet Balance - Funded Mainnet Address")
+    try:
+        # Known phantom dev wallet
+        address = "B1aLAAe4vW8nSQCetXnYqJfRxzTjnbooczwkUJAr7yMS"
+        response = requests.get(f"{BASE_URL}/wallet/balance/{address}")
+        data = response.json()
+        
+        if response.status_code != 200:
+            return print_result(False, f"Status code: {response.status_code}", data)
+        
+        # Check required fields
+        if "address" not in data or "sol" not in data or "usdc" not in data:
+            return print_result(False, "Missing required fields (address, sol, usdc)", data)
+        
+        if data["address"] != address:
+            return print_result(False, f"Address mismatch: expected {address}, got {data['address']}", data)
+        
+        # SOL and USDC should be numeric
+        if not isinstance(data["sol"], (int, float)):
+            return print_result(False, f"Invalid SOL type: {type(data['sol'])}", data)
+        
+        if not isinstance(data["usdc"], (int, float)):
+            return print_result(False, f"Invalid USDC type: {type(data['usdc'])}", data)
+        
+        return print_result(True, f"Funded address balance returned: SOL={data['sol']}, USDC={data['usdc']}", data)
+    except Exception as e:
+        return print_result(False, f"Exception: {str(e)}")
+
+def test_14_wallet_balance_invalid_address():
+    """Test 14: GET /api/wallet/balance/{address} - invalid address"""
+    print_test("14. Wallet Balance - Invalid Address")
+    try:
+        address = "notavalidaddress"
+        response = requests.get(f"{BASE_URL}/wallet/balance/{address}")
+        
+        # Should either return 0/0 gracefully or 5xx error (not crash)
+        if response.status_code == 200:
+            data = response.json()
+            if "address" in data and "sol" in data and "usdc" in data:
+                # Graceful handling - returns 0/0
+                return print_result(True, f"Invalid address handled gracefully: SOL={data['sol']}, USDC={data['usdc']}", data)
+            else:
+                return print_result(False, "Response missing required fields", data)
+        elif response.status_code >= 500:
+            # Server error is acceptable for invalid address
+            return print_result(True, f"Invalid address returned {response.status_code} error (acceptable)", {"status": response.status_code})
+        else:
+            return print_result(False, f"Unexpected status code: {response.status_code}", response.text)
+    except Exception as e:
+        return print_result(False, f"Exception: {str(e)}")
+
+def test_15_deposit_scan_valid_user():
+    """Test 15: POST /api/wallet/deposit/scan - valid user with wallet"""
+    print_test("15. Deposit Scan - Valid User")
+    try:
+        # Create test user with wallet address
+        test_user_helius = {
+            "privy_id": "helius_test_user",
+            "x_handle": "helius_qa",
+            "wallet_address": "So11111111111111111111111111111111111111112"
+        }
+        
+        # First create the user
+        create_response = requests.post(f"{BASE_URL}/users/upsert", json=test_user_helius)
+        if create_response.status_code != 200:
+            return print_result(False, f"Failed to create test user: {create_response.status_code}", create_response.json())
+        
+        # Now scan for deposits
+        headers = {"X-Privy-Id": "helius_test_user"}
+        response = requests.post(f"{BASE_URL}/wallet/deposit/scan", headers=headers)
+        data = response.json()
+        
+        if response.status_code != 200:
+            return print_result(False, f"Status code: {response.status_code}", data)
+        
+        # Check required fields
+        if "credited" not in data or "scanned" not in data:
+            return print_result(False, "Missing required fields (credited, scanned)", data)
+        
+        # Values should be numeric
+        if not isinstance(data["credited"], (int, float)):
+            return print_result(False, f"Invalid credited type: {type(data['credited'])}", data)
+        
+        if not isinstance(data["scanned"], (int, float)):
+            return print_result(False, f"Invalid scanned type: {type(data['scanned'])}", data)
+        
+        return print_result(True, f"Deposit scan successful: credited={data['credited']}, scanned={data['scanned']}", data)
+    except Exception as e:
+        return print_result(False, f"Exception: {str(e)}")
+
+def test_16_deposit_scan_nonexistent_user():
+    """Test 16: POST /api/wallet/deposit/scan - nonexistent user"""
+    print_test("16. Deposit Scan - Nonexistent User")
+    try:
+        headers = {"X-Privy-Id": "nonexistent_user_xyz"}
+        response = requests.post(f"{BASE_URL}/wallet/deposit/scan", headers=headers)
+        
+        if response.status_code == 404:
+            return print_result(True, "Nonexistent user correctly returns 404", {"status": response.status_code})
+        else:
+            data = response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text
+            return print_result(False, f"Expected 404, got {response.status_code}", data)
+    except Exception as e:
+        return print_result(False, f"Exception: {str(e)}")
+
+def test_17_deposit_scan_no_wallet():
+    """Test 17: POST /api/wallet/deposit/scan - user without wallet_address"""
+    print_test("17. Deposit Scan - User Without Wallet")
+    try:
+        # Create user without wallet_address
+        test_user_no_wallet = {
+            "privy_id": "no_wallet_user",
+            "x_handle": "nw"
+        }
+        
+        create_response = requests.post(f"{BASE_URL}/users/upsert", json=test_user_no_wallet)
+        if create_response.status_code != 200:
+            return print_result(False, f"Failed to create test user: {create_response.status_code}", create_response.json())
+        
+        # Try to scan deposits
+        headers = {"X-Privy-Id": "no_wallet_user"}
+        response = requests.post(f"{BASE_URL}/wallet/deposit/scan", headers=headers)
+        
+        if response.status_code == 400:
+            data = response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text
+            if "no wallet" in str(data).lower():
+                return print_result(True, "User without wallet correctly returns 400 'no wallet'", data)
+            else:
+                return print_result(False, f"Expected 'no wallet' message, got: {data}", data)
+        else:
+            data = response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text
+            return print_result(False, f"Expected 400, got {response.status_code}", data)
+    except Exception as e:
+        return print_result(False, f"Exception: {str(e)}")
+
+def test_18_regression_market_prices():
+    """Test 18: Regression - GET /api/markets/prices still returns 7 pairs"""
+    print_test("18. Regression - Market Prices (7 pairs)")
+    try:
+        response = requests.get(f"{BASE_URL}/markets/prices")
+        data = response.json()
+        
+        if response.status_code != 200:
+            return print_result(False, f"Status code: {response.status_code}", data)
+        
+        prices = data.get("prices", [])
+        if len(prices) != 7:
+            return print_result(False, f"Expected 7 pairs, got {len(prices)}", data)
+        
+        return print_result(True, f"Market prices still returns 7 pairs", {"pair_count": len(prices)})
+    except Exception as e:
+        return print_result(False, f"Exception: {str(e)}")
+
+def test_19_regression_landing_stats():
+    """Test 19: Regression - GET /api/stats/landing still works"""
+    print_test("19. Regression - Landing Stats")
+    try:
+        response = requests.get(f"{BASE_URL}/stats/landing")
+        data = response.json()
+        
+        if response.status_code != 200:
+            return print_result(False, f"Status code: {response.status_code}", data)
+        
+        required_fields = ["users", "trades", "total_volume", "monthly_volume", "max_leverage", "uptime"]
+        for field in required_fields:
+            if field not in data:
+                return print_result(False, f"Missing field: {field}", data)
+        
+        return print_result(True, "Landing stats still works with all required fields", data)
+    except Exception as e:
+        return print_result(False, f"Exception: {str(e)}")
+
 def run_all_tests():
     """Run all tests in sequence"""
     print("\n" + "="*80)
@@ -451,6 +655,18 @@ def run_all_tests():
     results.append(("Test 9: Validations", test_9_validations()))
     results.append(("Test 10: Leaderboard", test_10_leaderboard()))
     results.append(("Test 11: Landing Stats", test_11_landing_stats()))
+    
+    # New Helius wallet tests
+    results.append(("Test 12: Wallet Balance - Wrapped SOL", test_12_wallet_balance_wrapped_sol()))
+    results.append(("Test 13: Wallet Balance - Funded Address", test_13_wallet_balance_funded_address()))
+    results.append(("Test 14: Wallet Balance - Invalid Address", test_14_wallet_balance_invalid_address()))
+    results.append(("Test 15: Deposit Scan - Valid User", test_15_deposit_scan_valid_user()))
+    results.append(("Test 16: Deposit Scan - Nonexistent User", test_16_deposit_scan_nonexistent_user()))
+    results.append(("Test 17: Deposit Scan - No Wallet", test_17_deposit_scan_no_wallet()))
+    
+    # Regression tests
+    results.append(("Test 18: Regression - Market Prices", test_18_regression_market_prices()))
+    results.append(("Test 19: Regression - Landing Stats", test_19_regression_landing_stats()))
     
     # Summary
     print("\n" + "="*80)

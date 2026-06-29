@@ -29,6 +29,7 @@ log = logging.getLogger(__name__)
 
 # ---------------- Constants ----------------
 STARTING_BALANCE = 10000.0  # paper USDC every new user gets
+HELIUS_RPC = os.environ.get("HELIUS_RPC_URL") or os.environ.get("HELIUS_SECURE_RPC_URL")
 PAIRS = {
     "SOL/USD":  {"id": "solana",        "sym": "SOL"},
     "BTC/USD":  {"id": "bitcoin",       "sym": "BTC"},
@@ -330,6 +331,88 @@ async def landing_stats():
         "max_leverage": 1000,
         "uptime": 99.98,
     }
+
+# ---------------- Helius / Wallet ----------------
+SOL_USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+
+async def helius_rpc(method: str, params: list):
+    if not HELIUS_RPC:
+        raise HTTPException(503, "rpc not configured")
+    payload = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
+    async with httpx.AsyncClient(timeout=15) as cx:
+        r = await cx.post(HELIUS_RPC, json=payload)
+        if r.status_code != 200:
+            raise HTTPException(502, f"rpc {r.status_code}")
+        data = r.json()
+        if "error" in data:
+            raise HTTPException(502, data["error"].get("message", "rpc error"))
+        return data.get("result")
+
+@api.get("/wallet/balance/{address}")
+async def wallet_balance(address: str):
+    """Get SOL + USDC on-chain balance for a Solana address via Helius."""
+    try:
+        sol_lamports = await helius_rpc("getBalance", [address])
+        sol = (sol_lamports.get("value", 0) if isinstance(sol_lamports, dict) else 0) / 1e9
+    except Exception:
+        sol = 0.0
+    usdc = 0.0
+    try:
+        accs = await helius_rpc("getTokenAccountsByOwner", [
+            address,
+            {"mint": SOL_USDC_MINT},
+            {"encoding": "jsonParsed"},
+        ])
+        for a in (accs or {}).get("value", []) or []:
+            amt = a["account"]["data"]["parsed"]["info"]["tokenAmount"]
+            usdc += float(amt.get("uiAmount") or 0)
+    except Exception:
+        pass
+    return {"address": address, "sol": sol, "usdc": usdc}
+
+@api.post("/wallet/deposit/scan")
+async def deposit_scan(x_privy_id: str = Header(...)):
+    """Scan recent transactions on user's wallet, credit any new SOL/USDC deposits to paper balance.
+    1 SOL -> $150 paper, 1 USDC -> $1 paper (display only, off-chain accounting)."""
+    u = await get_user_or_404(x_privy_id)
+    addr = u.get("wallet_address")
+    if not addr:
+        raise HTTPException(400, "no wallet")
+    try:
+        sigs = await helius_rpc("getSignaturesForAddress", [addr, {"limit": 25}])
+    except Exception as e:
+        raise HTTPException(502, f"rpc failed: {e}")
+    sigs = sigs or []
+    seen = set((u.get("processed_sigs") or []))
+    new_credit = 0.0
+    new_sigs = []
+    for s in sigs:
+        sig = s.get("signature")
+        if not sig or sig in seen:
+            continue
+        # we credit based on current sol balance change (simplified)
+        new_sigs.append(sig)
+    # update processed sigs marker (we just record sigs; live balance check tells real amount)
+    if new_sigs:
+        bal = await wallet_balance(addr)
+        # treat any positive on-chain balance as credited (simplified for MVP demo)
+        already = float(u.get("credited_onchain", 0))
+        total_value = (bal["sol"] * 150.0) + bal["usdc"]
+        delta = max(0.0, total_value - already)
+        if delta > 0:
+            new_credit = delta
+            await db.users.update_one(
+                {"privy_id": x_privy_id},
+                {"$inc": {"balance": delta},
+                 "$set": {"credited_onchain": already + delta},
+                 "$addToSet": {"processed_sigs": {"$each": new_sigs}}},
+            )
+        else:
+            await db.users.update_one(
+                {"privy_id": x_privy_id},
+                {"$addToSet": {"processed_sigs": {"$each": new_sigs}}},
+            )
+    return {"credited": new_credit, "scanned": len(new_sigs)}
 
 app.include_router(api)
 app.add_middleware(

@@ -37,8 +37,7 @@ export default function AppShell({ children }) {
         {/* Sidebar */}
         <aside className="w-[230px] min-h-screen border-r-2 border-[#1f1f1f] bg-[#0a0a0a] p-4 hidden md:flex flex-col">
           <Link to="/" className="flex items-center gap-3 mb-10">
-            <PixelLogo size={5} />
-            <span className="font-pixel text-[9px] text-white">DEGENSBET</span>
+            <img src="/img/degens-logo.png" alt="DegensBet" className="h-8 pixelated" />
           </Link>
 
           <nav className="flex flex-col gap-1">

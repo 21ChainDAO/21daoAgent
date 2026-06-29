@@ -10,10 +10,9 @@ export default function Navbar() {
   return (
     <header className="relative z-40">
       <div className="max-w-[1400px] mx-auto px-6 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <PixelLogo size={6} />
-          <span className="font-pixel text-[10px] tracking-[0.2em] text-white flicker">DEGENSBET</span>
-        </div>
+        <Link to="/" className="flex items-center gap-3">
+          <img src="/img/degens-logo.png" alt="DegensBet" className="h-7 md:h-8 pixelated" />
+        </Link>
 
         <nav className="hidden md:flex items-center gap-8">
           {links.map(l => (

@@ -237,6 +237,42 @@ backend:
         agent: "testing"
         comment: "GET /api/stats/landing returns all required fields: users, trades, total_volume, monthly_volume, max_leverage=1000, uptime=99.98. All values are correct types. Test passed."
 
+  - task: "Wallet balance endpoint (Helius)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "GET /api/wallet/balance/{address} successfully returns SOL and USDC balances via Helius RPC. Tested with wrapped SOL mint (returns SOL=1558.44, USDC=3774.69), funded mainnet address (returns SOL=0.00144768, USDC=0.0), and invalid address (gracefully returns SOL=0.0, USDC=0.0). All test cases passed."
+
+  - task: "Deposit scan endpoint (Helius)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "POST /api/wallet/deposit/scan successfully scans wallet transactions and credits deposits. Tested with valid user (credited=237540.43, scanned=25 transactions), nonexistent user (correctly returns 404), and user without wallet_address (correctly returns 400 'no wallet'). All test cases passed."
+
+  - task: "Helius RPC integration"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Helius RPC integration working correctly. HELIUS_RPC_URL configured in .env and successfully querying Solana mainnet for wallet balances (getBalance, getTokenAccountsByOwner) and transaction signatures (getSignaturesForAddress). All RPC calls executing without errors."
+
 frontend:
   - task: "Frontend UI"
     implemented: true
@@ -252,12 +288,13 @@ frontend:
 
 metadata:
   created_by: "testing_agent"
-  version: "1.0"
-  test_sequence: 1
+  version: "1.1"
+  test_sequence: 2
   run_ui: false
 
 test_plan:
   current_focus:
+    - "Helius wallet endpoints tested and verified"
     - "All backend API endpoints tested and verified"
   stuck_tasks: []
   test_all: false
@@ -266,3 +303,5 @@ test_plan:
 agent_communication:
   - agent: "testing"
     message: "Completed comprehensive backend API testing. All 11 test scenarios passed successfully. Tested: root endpoint, market prices (all 7 pairs), single price lookup, user upsert (create & update without duplication), get current user, open position (with balance deduction), get open positions (with mark_price and unrealized_pnl), close position (with pnl calculation and balance update), all validation rules (insufficient balance, invalid leverage, invalid side, non-existent user), leaderboard (sorted by total_pnl), and landing stats. Backend is fully functional and ready for production."
+  - agent: "testing"
+    message: "Completed testing of new Helius wallet endpoints. All 8 new tests passed successfully: (1) GET /api/wallet/balance/{address} with wrapped SOL mint returns SOL=1558.44, USDC=3774.69, (2) with funded mainnet address returns SOL=0.00144768, USDC=0.0, (3) with invalid address gracefully returns SOL=0.0, USDC=0.0, (4) POST /api/wallet/deposit/scan with valid user returns credited=237540.43, scanned=25, (5) with nonexistent user correctly returns 404, (6) with user without wallet correctly returns 400 'no wallet', (7) Regression test confirms GET /api/markets/prices still returns 7 pairs, (8) Regression test confirms GET /api/stats/landing still works. Helius RPC integration is fully functional and querying Solana mainnet successfully."

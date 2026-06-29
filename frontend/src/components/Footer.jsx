@@ -14,8 +14,7 @@ export default function Footer() {
       <div className="max-w-[1400px] mx-auto px-6 py-16">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
           <div className="md:col-span-5">
-            <PixelLogo size={5} />
-            <div className="font-pixel text-[10px] text-white mt-4">DEGENSBET</div>
+            <img src="/img/degens-logo.png" alt="DegensBet" className="h-12 pixelated" />
             <p className="font-mono text-[18px] text-[#808080] mt-4 max-w-sm">
               An on-chain casino for the screen-burned. Built by degens, for degens.
             </p>

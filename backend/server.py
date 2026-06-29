@@ -873,9 +873,19 @@ async def competition_leaderboard(comp_id: str, limit: int = 50):
     if not comp:
         raise HTTPException(404, "competition not found")
     entries = await db.competition_entries.find({"competition_id": comp_id}).to_list(500)
+    user_ids = list({e["user_id"] for e in entries})
+    if user_ids:
+        users_cur = db.users.find(
+            {"id": {"$in": user_ids}},
+            {"_id": 0, "encrypted_privkey": 0},
+        )
+        users = await users_cur.to_list(len(user_ids))
+        user_map = {u["id"]: u for u in users}
+    else:
+        user_map = {}
     rows = []
     for e in entries:
-        u = await db.users.find_one({"id": e["user_id"]}, {"_id": 0, "encrypted_privkey": 0})
+        u = user_map.get(e["user_id"])
         if not u:
             continue
         acct = u.get(comp["account_type"]) or {}

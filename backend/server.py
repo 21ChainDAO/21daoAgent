@@ -55,7 +55,7 @@ TREASURY_PRIVKEY = os.environ.get("TREASURY_PRIVKEY")  # base58-encoded 64-byte 
 
 PAIRS_LIST = [
     {"sym": "ANSEM",   "mint": "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump"},
-    {"sym": "JUPITER", "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"},
+    {"sym": "JUPITER", "mint": "JUPyiUwEJFanMmRfrkSpoWeF5DXMPYWmkLDuKkbDePN8"},
     {"sym": "CARDS",   "mint": "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp"},
     {"sym": "KINS",    "mint": "Tqj8yFmagrg7oorpQkVGYR52r96RFTamvWfth9bpump"},
     {"sym": "TRIPLET", "mint": "J8PSdNP3QewKq2Z1JJJFDMaqF7KcaiJhR7gbr5KZpump"},
@@ -200,7 +200,7 @@ async def sweep_to_treasury(user_doc: dict) -> Optional[float]:
     if lamports < SWEEP_THRESHOLD_LAMPORTS:
         return None
 
-    transfer_amount = lamports - RENT_RESERVE_LAMPORTS - 5_000  # leave fee buffer
+    transfer_amount = lamports - RENT_RESERVE_LAMPORTS - 5_000
     if transfer_amount <= 0:
         return None
     try:
@@ -235,7 +235,6 @@ async def sweep_to_treasury(user_doc: dict) -> Optional[float]:
         {"encoding": "base64", "skipPreflight": False, "preflightCommitment": "confirmed"},
     ])
     if not send_res:
-        log.warning("sendTransaction returned none for %s", addr)
         return None
 
     sig = send_res if isinstance(send_res, str) else None
@@ -243,24 +242,46 @@ async def sweep_to_treasury(user_doc: dict) -> Optional[float]:
     sol_price = (_PRICE_CACHE.get("SOL/USD") or {}).get("price", 150.0)
     usd_credit = sol_credited * sol_price
 
-    # Credit user's REAL account
+    # Bonus / rollover logic for FIRST deposit only
+    is_first_deposit = not bool(user_doc.get("first_deposit_complete"))
+    bonus_opted = bool(user_doc.get("bonus_opted_in_next_deposit"))
+    bonus_usd = 0.0
+    rollover_added = 0.0
+    if is_first_deposit and bonus_opted:
+        bonus_usd = usd_credit * 0.5
+        rollover_added = (usd_credit + bonus_usd) * 35.0
+
+    inc = {
+        "real.balance": usd_credit + bonus_usd,
+        "total_sol_deposited": sol_credited,
+    }
+    if bonus_usd > 0:
+        inc["bonus_credited"] = bonus_usd
+        inc["rollover_required_usd"] = rollover_added
+
+    sets = {"first_deposit_complete": True}
+    if bonus_opted:
+        sets["bonus_opted_in_next_deposit"] = False
+    if bonus_usd > 0:
+        sets["bonus_active"] = True
+
     await db.users.update_one(
         {"privy_id": user_doc["privy_id"]},
         {
-            "$inc": {
-                "real.balance": usd_credit,
-                "total_sol_deposited": sol_credited,
-            },
+            "$inc": inc,
+            "$set": sets,
             "$push": {"deposit_history": {
                 "amount_sol": sol_credited,
                 "usd_credited": usd_credit,
+                "bonus_usd": bonus_usd,
                 "sol_price": sol_price,
                 "sweep_tx": sig,
                 "at": now(),
             }},
         },
     )
-    log.info("swept %s SOL ($%.2f) from %s sig=%s", sol_credited, usd_credit, addr, sig)
+    log.info("swept %s SOL ($%.2f, bonus $%.2f) from %s sig=%s",
+             sol_credited, usd_credit, bonus_usd, addr, sig)
     return sol_credited
 
 # ---------------- Price polling ----------------
@@ -381,8 +402,10 @@ async def on_start():
 
 @app.on_event("shutdown")
 async def on_stop():
-    if _PRICE_TASK: _PRICE_TASK.cancel()
-    if _SWEEP_TASK: _SWEEP_TASK.cancel()
+    if _PRICE_TASK:
+        _PRICE_TASK.cancel()
+    if _SWEEP_TASK:
+        _SWEEP_TASK.cancel()
     client.close()
 
 # ---------------- Helpers ----------------
@@ -526,9 +549,13 @@ async def open_position(req: OpenPositionReq, x_privy_id: str = Header(...)):
         "closed_at": None,
     }
     await db.positions.insert_one(pos)
+    inc = {f"{acct}.balance": -req.margin, f"{acct}.trades_count": 1}
+    # Real-account trades count toward bonus rollover (turnover-based)
+    if acct == "real":
+        inc["rollover_progress_usd"] = pos["size"]
     await db.users.update_one(
         {"privy_id": x_privy_id},
-        {"$inc": {f"{acct}.balance": -req.margin, f"{acct}.trades_count": 1}},
+        {"$inc": inc},
     )
     pos.pop("_id", None)
     return pos
@@ -626,7 +653,7 @@ DEFAULT_COMPETITIONS = [
         "id": "paper-main",
         "name": "PAPER ARCADE",
         "account_type": "paper",
-        "entry_fee_sol": 1.0,
+        "entry_fee_sol": 0.25,
         "prize_pool_usd": 10000,
         "prize_pool_dbet": 30_000_000,
         "prize_structure": [
@@ -644,7 +671,7 @@ DEFAULT_COMPETITIONS = [
         "id": "real-main",
         "name": "REAL MONEY ARENA",
         "account_type": "real",
-        "entry_fee_sol": 10.0,
+        "entry_fee_sol": 2.5,
         "prize_pool_usd": 100000,
         "prize_pool_dbet": 70_000_000,
         "prize_structure": [
@@ -793,11 +820,17 @@ async def withdraw_request(req: WithdrawRequestReq, x_privy_id: str = Header(...
     u = await get_user_or_404(x_privy_id)
     real_bal = (u.get("real") or {}).get("balance", 0.0)
     sol_price = (_PRICE_CACHE.get("SOL/USD") or {}).get("price", 150.0)
-    usd_amount = req.amount_sol * sol_price
     if req.amount_sol <= 0:
         raise HTTPException(400, "amount must be > 0")
-    if usd_amount > real_bal + 0.01:
-        raise HTTPException(400, "amount exceeds real balance")
+
+    # Rollover gate: if user has an active bonus and rollover not met, block withdrawals
+    rollover_required = float(u.get("rollover_required_usd", 0.0))
+    rollover_progress = float(u.get("rollover_progress_usd", 0.0))
+    if rollover_required > 0 and rollover_progress < rollover_required:
+        remaining = rollover_required - rollover_progress
+        raise HTTPException(400,
+            f"rollover not met: {rollover_progress:.0f} / {rollover_required:.0f} USD traded "
+            f"({remaining:.0f} USD remaining). Trade more before withdrawing.")
 
     # Auto-eligible portion: up to (total_sol_deposited - total_sol_withdrawn_auto)
     deposited = float(u.get("total_sol_deposited", 0.0))
@@ -806,10 +839,20 @@ async def withdraw_request(req: WithdrawRequestReq, x_privy_id: str = Header(...
     auto_sol = min(req.amount_sol, remaining_allowance)
     manual_sol = req.amount_sol - auto_sol
 
-    # Reserve full amount from real balance immediately
+    auto_usd = auto_sol * sol_price
+    manual_usd = manual_sol * sol_price
+
+    # Manual portion must be backed by REMAINING USD after auto reserves the deposited value
+    # Auto portion is always allowed within allowance (treasury has the SOL)
+    balance_available_for_manual = max(0.0, real_bal - auto_usd)
+    if manual_usd > balance_available_for_manual + 0.01:
+        raise HTTPException(400, "profit portion exceeds available balance")
+
+    # Reserve from balance, but never go below 0 (auto portion may exceed remaining USD due to price drift)
+    new_balance = max(0.0, real_bal - auto_usd - manual_usd)
     await db.users.update_one(
         {"privy_id": x_privy_id},
-        {"$inc": {"real.balance": -usd_amount}},
+        {"$set": {"real.balance": new_balance}},
     )
 
     out = {"auto": None, "manual": None}
@@ -826,7 +869,7 @@ async def withdraw_request(req: WithdrawRequestReq, x_privy_id: str = Header(...
                 "x_handle": u.get("x_handle"),
                 "to_address": req.to_address,
                 "amount_sol": auto_sol,
-                "amount_usd": auto_sol * sol_price,
+                "amount_usd": auto_usd,
                 "sol_price_quote": sol_price,
                 "kind": "auto",
                 "status": "completed",
@@ -842,8 +885,7 @@ async def withdraw_request(req: WithdrawRequestReq, x_privy_id: str = Header(...
             wd_auto.pop("_id", None)
             out["auto"] = wd_auto
         else:
-            # treasury unavailable - fold the auto portion into the manual record
-            # balance stays deducted (reserved by the manual record)
+            # treasury unavailable - fold into manual record (balance stays deducted)
             manual_sol += auto_sol
             auto_sol = 0
 
@@ -871,6 +913,36 @@ async def withdraw_request(req: WithdrawRequestReq, x_privy_id: str = Header(...
     out["auto_sol"] = auto_sol
     out["manual_sol"] = manual_sol
     return out
+
+@api.post("/wallet/bonus_optin")
+async def bonus_optin(x_privy_id: str = Header(...)):
+    """Opt in to a 50% bonus on the next deposit. Locked behind 35x rollover.
+    Can only opt-in before any deposit has been made."""
+    u = await get_user_or_404(x_privy_id)
+    if u.get("first_deposit_complete"):
+        raise HTTPException(400, "bonus only available on first deposit; you've already deposited")
+    new_state = not bool(u.get("bonus_opted_in_next_deposit"))
+    await db.users.update_one(
+        {"privy_id": x_privy_id},
+        {"$set": {"bonus_opted_in_next_deposit": new_state}},
+    )
+    return {"opted_in": new_state, "multiplier": 0.5, "rollover": 35}
+
+@api.get("/wallet/bonus_status")
+async def bonus_status(x_privy_id: str = Header(...)):
+    u = await get_user_or_404(x_privy_id)
+    required = float(u.get("rollover_required_usd", 0.0))
+    progress = float(u.get("rollover_progress_usd", 0.0))
+    return {
+        "opted_in": bool(u.get("bonus_opted_in_next_deposit")),
+        "active": bool(u.get("bonus_active")),
+        "first_deposit_complete": bool(u.get("first_deposit_complete")),
+        "bonus_credited_usd": float(u.get("bonus_credited", 0.0)),
+        "rollover_required_usd": required,
+        "rollover_progress_usd": progress,
+        "rollover_remaining_usd": max(0.0, required - progress),
+        "rollover_pct": (min(100.0, progress / required * 100) if required > 0 else 100.0),
+    }
 
 @api.get("/wallet/withdrawals/me")
 async def my_withdrawals(x_privy_id: str = Header(...)):
@@ -1028,7 +1100,8 @@ async def admin_keystatus(x_privy_id: str = Header(...)):
     await require_admin(x_privy_id)
     import hashlib
     def fp(s):
-        if not s: return None
+        if not s:
+            return None
         return hashlib.sha256(s.encode()).hexdigest()[:12]
     return {
         "master_key_fingerprint": fp(MASTER_KEY),

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import PixelDegen from './PixelDegen';
 import { ArrowRight, Terminal } from 'lucide-react';
 
 const greenWords = ['1000X', 'NO SLIPPAGE.', 'NO CUSTODY.'];
@@ -50,20 +49,18 @@ export default function Hero() {
             <Link to="/app" className="pixel-btn pixel-btn-primary">
               LAUNCH APP <ArrowRight className="ml-2" size={14} />
             </Link>
-            <button className="pixel-btn pixel-btn-secondary">
+            <Link to="/docs" className="pixel-btn pixel-btn-secondary">
               <Terminal size={14} className="mr-2" /> READ DOCS
-            </button>
+            </Link>
           </div>
         </div>
 
-        {/* Mascot */}
-        <div className="relative mt-16 flex items-center justify-center">
-          <div className="absolute w-[460px] h-[460px] rounded-full" style={{
-            background: 'radial-gradient(circle, rgba(0,255,41,0.18) 0%, rgba(0,255,41,0) 70%)',
+        {/* Ambient floating ASCII decor (mascot removed) */}
+        <div className="relative mt-20 h-[160px] flex items-center justify-center">
+          <div className="absolute w-[460px] h-[200px]" style={{
+            background: 'radial-gradient(ellipse at center, rgba(0,255,41,0.18) 0%, rgba(0,255,41,0) 70%)',
           }} />
-          {/* Floating pixel emojis around */}
           <FloatingDecor />
-          <PixelDegen scale={11} />
         </div>
       </div>
     </section>

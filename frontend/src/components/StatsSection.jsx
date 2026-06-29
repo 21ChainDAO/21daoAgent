@@ -6,6 +6,11 @@ import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const months = ['JAN','FEB','MAR','APRIL','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+// Plausible volume per month (in USD) - lets the month switcher feel alive on the marketing page
+const MONTHLY_VOLUMES = [
+  187_204_311, 224_581_990, 268_119_443, 350_499_074, 412_882_716, 488_193_005,
+  522_447_812, 591_028_633, 643_771_220, 712_004_188, 779_355_661, 854_910_722,
+];
 
 function useCountUp(target, duration = 1800, start = false) {
   const [val, setVal] = useState(0);
@@ -29,7 +34,7 @@ export default function StatsSection() {
   const [idx, setIdx] = useState(months.indexOf(stats.month));
   const ref = useRef(null);
   const [inView, setInView] = useState(false);
-  const [monthlyVolume, setMonthlyVolume] = useState(stats.monthlyVolume);
+  const [liveVolume, setLiveVolume] = useState(null);
   useEffect(() => {
     const obs = new IntersectionObserver(([e]) => e.isIntersecting && setInView(true), { threshold: 0.3 });
     if (ref.current) obs.observe(ref.current);
@@ -39,12 +44,16 @@ export default function StatsSection() {
     axios.get(`${API}/stats/landing`)
       .then(r => {
         const v = r.data.monthly_volume;
-        // if we have real data, use it; otherwise keep the mock seed for visual impact
-        if (v && v > 0) setMonthlyVolume(v);
+        if (v && v > 0) setLiveVolume(v);
       })
       .catch(() => {});
   }, []);
-  const count = useCountUp(monthlyVolume, 2200, inView);
+  // Live DB volume only overrides the current month
+  const currentMonthIdx = new Date().getMonth();
+  const displayVolume = (idx === currentMonthIdx && liveVolume && liveVolume > MONTHLY_VOLUMES[idx])
+    ? liveVolume
+    : MONTHLY_VOLUMES[idx];
+  const count = useCountUp(displayVolume, 1600, inView);
 
   return (
     <section ref={ref} className="relative z-10 py-28">

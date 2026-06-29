@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { sidebarLinks, markets, orderBookAsks, orderBookBids } from '../mock';
 import { LayoutDashboard, BarChart3, TrendingUp, Wallet, Trophy, Settings, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
@@ -66,7 +67,7 @@ export default function TradingPreview() {
             Spin up a position on any market with a single keystroke. The arcade is open 24/7.
           </p>
           <div className="flex gap-4 mt-8">
-            <button className="pixel-btn pixel-btn-primary">OPEN TERMINAL</button>
+            <Link to="/app" className="pixel-btn pixel-btn-primary">OPEN TERMINAL</Link>
           </div>
         </div>
 

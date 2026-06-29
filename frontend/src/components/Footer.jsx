@@ -64,7 +64,7 @@ export default function Footer() {
             &copy; {new Date().getFullYear()} DEGENSBET // ALL RIGHTS RESERVED
           </div>
           <div className="font-pixel text-[8px] text-[#808080]">
-            BUILD 0x4A2F &middot; <span className="text-[#00FF29] flicker">MAINNET ONLINE</span>
+            <span className="text-[#00FF29] flicker">MAINNET ONLINE</span>
           </div>
         </div>
       </div>

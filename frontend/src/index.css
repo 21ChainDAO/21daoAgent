@@ -182,5 +182,11 @@ body {
 ::-webkit-scrollbar-thumb { background: #1f1f1f; border: 2px solid #050505; }
 ::-webkit-scrollbar-thumb:hover { background: #13b84d; }
 
+/* Hide platform branding badge */
+#emergent-badge, [id*="emergent-badge"], [class*="emergent-badge"],
+a[href*="emergent.sh"][target="_blank"] {
+  display: none !important;
+}
+
 /* Image render crisp pixel */
 .pixelated { image-rendering: pixelated; image-rendering: crisp-edges; }

@@ -33,7 +33,6 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden md:flex items-center gap-3">
-          <Link to="/app" className="pixel-btn pixel-btn-secondary !py-2 !px-4 !text-[9px]">CONNECT</Link>
           <Link to="/app" className="pixel-btn pixel-btn-primary !py-2 !px-4 !text-[9px]">LAUNCH APP</Link>
         </div>
 
@@ -48,7 +47,6 @@ export default function Navbar() {
             <Link key={l.label} to={l.to} className="font-pixel text-[10px] text-[#808080]">{l.label}</Link>
           ))}
           <div className="flex gap-3 mt-2">
-            <Link to="/app" className="pixel-btn pixel-btn-secondary !py-2 !px-4 !text-[9px]">CONNECT</Link>
             <Link to="/app" className="pixel-btn pixel-btn-primary !py-2 !px-4 !text-[9px]">LAUNCH</Link>
           </div>
         </div>

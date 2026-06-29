@@ -4,7 +4,8 @@ import { useAppUser } from './UserSync';
 import { useAccount } from './AccountContext';
 import { usePrices } from './PricesProvider';
 import { api, PAIRS, fmtUsd, formatPrice } from '../lib/api';
-import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Share2 } from 'lucide-react';
+import PnlShareModal from '../components/PnlShareModal';
 
 export default function TradeView() {
   const { dbUser, refresh } = useAppUser();
@@ -20,9 +21,41 @@ export default function TradeView() {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState([]);
+  const [sharePos, setSharePos] = useState(null); // closed position to share
+
+  const shareUrl = (typeof window !== 'undefined' ? window.location.origin : 'https://degens.bet') + '/app';
 
   const acct = dbUser?.[account] || { balance: 0 };
   const px = prices[pair];
+
+  // pair fallback - if URL pair isn't in price feed, use first available
+  useEffect(() => {
+    if (!Object.keys(prices).length) return;
+    if (!prices[pair]) {
+      const fallback = PAIRS.find(p => prices[p]) || PAIRS[0];
+      if (fallback !== pair) {
+        setPair(fallback);
+        setParams({ pair: fallback });
+      }
+    }
+  }, [prices, pair, setParams]);
+
+  // seed chart with synthetic history derived from 24h change so it's not empty
+  useEffect(() => {
+    if (!px) { setHistory([]); return; }
+    const nowMs = Date.now();
+    const change = (px.change_24h || 0) / 100;
+    const startPrice = px.price / (1 + change);
+    const seeded = Array.from({ length: 30 }, (_, i) => {
+      const t = nowMs - (29 - i) * 2 * 60 * 1000;
+      const progress = i / 29;
+      const noise = (Math.sin(i * 0.73) + Math.cos(i * 1.31)) * Math.abs(change) * 0.18 * px.price;
+      const p = startPrice + (px.price - startPrice) * progress + noise;
+      return { t, p: Math.max(p, 0.00000001) };
+    });
+    setHistory(seeded);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pair]);
 
   useEffect(() => {
     if (!px) return;
@@ -33,7 +66,6 @@ export default function TradeView() {
       return [...h, { t, p: px.price }].slice(-60);
     });
   }, [px?.updated_at, pair]);
-  useEffect(() => { setHistory([]); }, [pair]);
 
   const loadPositions = async () => {
     try {
@@ -69,9 +101,11 @@ export default function TradeView() {
   const closeTrade = async (id) => {
     setBusy(true);
     try {
-      await api.post('/positions/close', { position_id: id });
+      const r = await api.post('/positions/close', { position_id: id });
       await refresh();
       await loadPositions();
+      // Auto-open share card for the closed position
+      if (r?.data) setSharePos(r.data);
     } catch (e) {
       setErr(e.response?.data?.detail || 'failed');
     } finally { setBusy(false); }
@@ -223,6 +257,67 @@ export default function TradeView() {
           </div>
         )}
       </div>
+
+      {/* Recently closed positions — share PnL card */}
+      {hist.length > 0 && (
+        <div className="pixel-card p-4">
+          <div className="font-pixel text-[10px] text-[#808080] mb-3">// RECENTLY CLOSED [{hist.length}]</div>
+          <div className="overflow-x-auto">
+            <table className="w-full font-mono text-[14px]">
+              <thead>
+                <tr className="font-pixel text-[7px] text-[#808080] border-b border-[#1f1f1f]">
+                  <th className="text-left py-2">PAIR</th>
+                  <th className="text-left">SIDE</th>
+                  <th className="text-right">ENTRY \u2192 EXIT</th>
+                  <th className="text-right">PNL</th>
+                  <th className="text-right">STATUS</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {hist.map(p => {
+                  const pnlPct = p.margin ? (p.pnl / p.margin) * 100 : 0;
+                  return (
+                    <tr key={p.id} className="border-b border-[#1f1f1f]/50">
+                      <td className="py-3 text-white">{p.pair}</td>
+                      <td className={p.side === 'long' ? 'text-[#00FF29]' : 'text-[#ff3838]'}>{p.side.toUpperCase()} {p.leverage}x</td>
+                      <td className="text-right text-[#808080]">{formatPrice(p.entry_price)} \u2192 {formatPrice(p.exit_price)}</td>
+                      <td className={`text-right ${(p.pnl || 0) >= 0 ? 'text-[#00FF29]' : 'text-[#ff3838]'}`}>
+                        {fmtUsd(p.pnl || 0, { sign: true })}
+                        <span className="font-pixel text-[7px] ml-1 opacity-70">
+                          ({pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(0)}%)
+                        </span>
+                      </td>
+                      <td className="text-right">
+                        <span className={`font-pixel text-[7px] ${p.status === 'liquidated' ? 'text-[#ff3838]' : 'text-[#808080]'}`}>
+                          {p.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="text-right">
+                        <button
+                          data-testid={`share-pnl-${p.id}`}
+                          onClick={() => setSharePos(p)}
+                          className="px-3 py-1 font-pixel text-[8px] bg-[#0d0d0d] border border-[#00FF29] text-[#00FF29] hover:bg-[#00FF29] hover:text-[#050505] flex items-center gap-1 ml-auto"
+                        >
+                          <Share2 size={10} /> SHARE
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <PnlShareModal
+        open={!!sharePos}
+        onClose={() => setSharePos(null)}
+        position={sharePos}
+        handle={dbUser?.x_handle}
+        shareUrl={shareUrl}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useAppUser } from './UserSync';
 import { Copy, Check, AlertTriangle, RefreshCw, ExternalLink, ArrowDownToLine, ArrowUpFromLine, Gift, X, Info, ShieldCheck, Clock } from 'lucide-react';
 import { api, fmtUsd } from '../lib/api';
+import { copyText } from '../lib/clipboard';
 
 export default function WalletPage() {
   const { dbUser, refresh } = useAppUser();
@@ -54,9 +55,11 @@ export default function WalletPage() {
 
   const copy = async () => {
     if (!addr) return;
-    await navigator.clipboard.writeText(addr);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    const ok = await copyText(addr);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
   };
 
   const sweepNow = async () => {

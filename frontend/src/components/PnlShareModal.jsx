@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { toPng } from 'html-to-image';
 import { X, Download, Twitter, Copy, Check } from 'lucide-react';
 import PnlCard from './PnlCard';
+import { copyText } from '../lib/clipboard';
 
 /**
  * Modal that wraps PnlCard and provides Download PNG / Share to X / Copy link.
@@ -58,11 +59,11 @@ export default function PnlShareModal({ open, onClose, position, handle, shareUr
   };
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(tweetText());
+    const ok = await copyText(tweetText());
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
-    } catch (e) { /* noop */ }
+    }
   };
 
   return (

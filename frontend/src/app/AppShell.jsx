@@ -5,6 +5,7 @@ import { useAppUser } from './UserSync';
 import { useAccount } from './AccountContext';
 import { LayoutDashboard, TrendingUp, Trophy, Wallet, LogOut, Copy, Check, Swords, ShieldCheck } from 'lucide-react';
 import { api, fmtUsd } from '../lib/api';
+import { copyText } from '../lib/clipboard';
 
 const nav = [
   { to: '/app', icon: LayoutDashboard, label: 'DASHBOARD', end: true },
@@ -34,9 +35,11 @@ export default function AppShell({ children }) {
 
   const copy = async () => {
     if (!addr) return;
-    await navigator.clipboard.writeText(addr);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    const ok = await copyText(addr);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
   };
 
   const navItems = isAdmin

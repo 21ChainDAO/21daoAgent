@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
+import { copyText } from '../lib/clipboard';
 
 // Live $DEGEN contract address (Solana).
 const DEGEN_CA = 'BkEqYRg7CqHwuEeUk1eyvAurcaUMzT9R1Xi3ZByspump';
@@ -17,11 +18,11 @@ export default function CaBadge() {
     e.preventDefault();
     e.stopPropagation();
     if (!isLive) return;
-    try {
-      await navigator.clipboard.writeText(DEGEN_CA);
+    const ok = await copyText(DEGEN_CA);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
-    } catch (_) { /* noop */ }
+    }
   };
 
   const short = isLive

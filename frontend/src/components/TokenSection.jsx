@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Coins, Lock, Gift, Swords, Rocket, Check, Copy } from 'lucide-react';
+import { copyText } from '../lib/clipboard';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -28,9 +29,11 @@ export default function TokenSection() {
 
   const copy = async () => {
     if (!info?.contract || info.contract === 'TBA') return;
-    await navigator.clipboard.writeText(info.contract);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    const ok = await copyText(info.contract);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
   };
 
   if (!info) return null;

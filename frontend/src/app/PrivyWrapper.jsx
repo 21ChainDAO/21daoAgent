@@ -1,24 +1,26 @@
 import React from 'react';
 import { PrivyProvider } from '@privy-io/react-auth';
 
-// Replace with your real Privy App ID from https://dashboard.privy.io
-const PRIVY_APP_ID = process.env.REACT_APP_PRIVY_APP_ID || 'clpispdty00ycl80fpueukbhl';
+// App ID from https://dashboard.privy.io - set REACT_APP_PRIVY_APP_ID in frontend/.env
+const PRIVY_APP_ID = process.env.REACT_APP_PRIVY_APP_ID || 'cmq45366d00c60cleqhgf79jl';
 
 export default function PrivyWrapper({ children }) {
   return (
     <PrivyProvider
       appId={PRIVY_APP_ID}
       config={{
-        loginMethods: ['twitter', 'wallet', 'email'],
+        // X (Twitter) first, wallet as fallback. Email disabled to reduce friction.
+        loginMethods: ['twitter', 'wallet'],
         appearance: {
           theme: 'dark',
           accentColor: '#00FF29',
-          logo: undefined,
           showWalletLoginFirst: false,
+          walletList: ['phantom', 'solflare', 'backpack', 'detected_wallets'],
         },
+        // Server-side custodial Solana wallets are used for deposits.
+        // Disable Privy embedded EVM wallets to avoid a chain mismatch UX.
         embeddedWallets: {
-          createOnLogin: 'users-without-wallets',
-          requireUserPasswordOnCreate: false,
+          createOnLogin: 'off',
         },
       }}
     >

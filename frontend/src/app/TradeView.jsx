@@ -11,7 +11,7 @@ export default function TradeView() {
   const { account } = useAccount();
   const { prices } = usePrices();
   const [params, setParams] = useSearchParams();
-  const [pair, setPair] = useState(params.get('pair') || 'SOL/USD');
+  const [pair, setPair] = useState(params.get('pair') || 'ANSEM/USD');
   const [side, setSide] = useState('long');
   const [margin, setMargin] = useState(100);
   const [leverage, setLeverage] = useState(10);

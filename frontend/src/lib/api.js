@@ -10,7 +10,7 @@ export function setAuthHeader(privyId) {
   else delete api.defaults.headers.common['X-Privy-Id'];
 }
 
-export const PAIRS = ['SOL/USD','BTC/USD','ETH/USD','BONK/USD','WIF/USD','JUP/USD','PEPE/USD'];
+export const PAIRS = ['ANSEM/USD','JUPITER/USD','CARDS/USD','KINS/USD','TRIPLET/USD','JOTCHUA/USD','WORLD/USD','DROOL/USD'];
 
 export function formatPrice(n) {
   if (n == null) return '-';

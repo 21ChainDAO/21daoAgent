@@ -471,6 +471,18 @@ backend:
         agent: "testing"
         comment: "✅ WITHDRAWAL FIX VERIFIED! Comprehensive re-test of all 5 scenarios PASSED. (1) Reset test user: Successfully reset privy_id=wd_test_1 with real.balance=750, total_sol_deposited=1.0, total_sol_withdrawn_auto=0. (2) Auto-eligible withdrawal (0.5 SOL): Correctly converts to single manual record (auto=null, manual={kind:manual, status:pending, amount_sol:0.5}, auto_sol=0, manual_sol=0.5). Balance correctly deducted from $750 to $712.82 (0.5*$74.36 SOL price). NO balance refund. Exactly 1 withdrawal record (kind=manual, status=pending). NO auto_failed records. (3) Mixed withdrawal (1.4 SOL = 1 auto + 0.4 profit): Correctly creates single manual record (auto_sol=0, manual_sol=1.4). Balance correctly deducted by $104.10 (1.4*$74.36). Exactly 1 manual withdrawal record. (4) Admin reject refund: Successfully refunded $104.10 back to user's balance ($645.90 → $750.00). (5) Regression: GET /api/markets/prices returns all 7 pairs. FIX CONFIRMED: Lines 784-788 in server.py now correctly fold auto portion into manual_sol when treasury send fails, keeping balance deducted for pending manual withdrawal. No duplicate records created."
 
+  - task: "Trading pairs swap - 8 Solana memecoins via DexScreener"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ TRADING PAIRS SWAP COMPLETE - ALL 8 TESTS PASSED! Major backend upgrade from 7 major pairs (CoinGecko) to 8 Solana memecoins (DexScreener). VERIFIED: (1) GET /api/markets/prices returns EXACTLY 8 pairs (ANSEM, JUPITER, CARDS, KINS, TRIPLET, JOTCHUA, WORLD, DROOL) with correct structure including mint addresses, prices ($0.1048-$1112.41), change_24h, and updated_at. SOL/USD is NOT in the list (internal only). (2) Single pair lookup: GET /api/markets/price/ANSEM/USD returns ANSEM pair object with mint=9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump. GET /api/markets/price/SOL/USD still works (returns $75.53 for internal deposit conversion). (3) Trade flow on ANSEM/USD: Created user, opened paper position (margin=200, leverage=5, size=1000, entry_price=$0.1048 matching current price), GET /api/positions/me returns position with mark_price and unrealized_pnl populated. (4) Old pair rejection: POST /api/positions/open with BTC/USD correctly returns 400 'unsupported pair'. (5) Token endpoint: GET /api/token returns EXACTLY 4 tokenomics entries (LOCKED 50%/500M, REAL REWARDS 7%/70M, PAPER REWARDS 3%/30M, PUBLIC LAUNCH 40%/400M, total=100%/1B). (6) Competitions intact: paper-main (1 SOL entry, $10k pool, 30M dBET) and real-main (10 SOL entry, $100k pool, 70M dBET) both present with correct prize structures. (7) Deposit conversion: User created with custodial address, SOL/USD price available internally ($75.53 > $50 sanity check passed). (8) Regression: Landing stats, leaderboard, user upsert idempotency, wallet balance all working. DexScreener price feed operational with live prices and 24h changes."
+
 frontend:
   - task: "Frontend UI"
     implemented: true
@@ -486,17 +498,20 @@ frontend:
 
 metadata:
   created_by: "testing_agent"
-  version: "1.4"
-  test_sequence: 5
+  version: "1.5"
+  test_sequence: 6
   run_ui: false
 
 test_plan:
   current_focus:
-    - "Withdrawal fix verified and working correctly"
+    - "Trading pairs swap verified - 8 Solana memecoins via DexScreener"
     - "All backend endpoints tested and functional"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+  - agent: "testing"
+    message: "🎉 TRADING PAIRS SWAP COMPLETE - ALL 8 TESTS PASSED! Major backend upgrade from 7 major crypto pairs (CoinGecko) to 8 Solana memecoins (DexScreener). Comprehensive testing verified: (1) GET /api/markets/prices returns EXACTLY 8 pairs with correct symbols (ANSEM, JUPITER, CARDS, KINS, TRIPLET, JOTCHUA, WORLD, DROOL), mint addresses, live prices ($0.1048-$1112.41), 24h changes, and timestamps. SOL/USD correctly excluded from public list. (2) Single pair lookup working for ANSEM/USD (returns mint address) and SOL/USD (internal use, $75.53). (3) Full trade flow on ANSEM/USD: user creation, position opening (margin=200, leverage=5, size=1000, entry_price=$0.1048), position retrieval with mark_price and unrealized_pnl. (4) Old pair BTC/USD correctly rejected with 400 'unsupported pair'. (5) Token endpoint returns 4 tokenomics entries (LOCKED 50%/500M, REAL REWARDS 7%/70M, PAPER REWARDS 3%/30M, PUBLIC LAUNCH 40%/400M, total=100%/1B). (6) Competitions intact with correct dBET prizes (paper-main: 30M dBET, real-main: 70M dBET). (7) Deposit conversion working (SOL/USD available internally). (8) All regression tests passed (landing stats, leaderboard, user upsert, wallet balance). DexScreener price feed operational with real-time data. Backend fully functional and ready for production."
+
 
 agent_communication:
   - agent: "testing"

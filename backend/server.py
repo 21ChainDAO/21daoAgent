@@ -53,15 +53,17 @@ SWEEP_INTERVAL_SECONDS = 45
 ADMIN_X_HANDLES = [h.strip().lower() for h in (os.environ.get("ADMIN_X_HANDLES", "")).split(",") if h.strip()]
 TREASURY_PRIVKEY = os.environ.get("TREASURY_PRIVKEY")  # base58-encoded 64-byte secret key or 32-byte seed
 
-PAIRS = {
-    "SOL/USD":  {"id": "solana",        "sym": "SOL"},
-    "BTC/USD":  {"id": "bitcoin",       "sym": "BTC"},
-    "ETH/USD":  {"id": "ethereum",      "sym": "ETH"},
-    "BONK/USD": {"id": "bonk",          "sym": "BONK"},
-    "WIF/USD":  {"id": "dogwifcoin",    "sym": "WIF"},
-    "JUP/USD":  {"id": "jupiter-exchange-solana", "sym": "JUP"},
-    "PEPE/USD": {"id": "pepe",          "sym": "PEPE"},
-}
+PAIRS_LIST = [
+    {"sym": "ANSEM",   "mint": "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump"},
+    {"sym": "JUPITER", "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"},
+    {"sym": "CARDS",   "mint": "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp"},
+    {"sym": "KINS",    "mint": "Tqj8yFmagrg7oorpQkVGYR52r96RFTamvWfth9bpump"},
+    {"sym": "TRIPLET", "mint": "J8PSdNP3QewKq2Z1JJJFDMaqF7KcaiJhR7gbr5KZpump"},
+    {"sym": "JOTCHUA", "mint": "BcHEaaTCvycPwwsJ9yQTXdHP9X2gCLkznDbZ8VySpump"},
+    {"sym": "WORLD",   "mint": "FMqh9mqR6drPZqqW6wPqLHxX4rqNDWGhYLaMfoaJpump"},
+    {"sym": "DROOL",   "mint": "B6f27ETGcjgGNB1fqULJbXVmw9FnL8HgBp7R83hmpump"},
+]
+PAIRS = {f"{p['sym']}/USD": {"mint": p["mint"], "sym": p["sym"]} for p in PAIRS_LIST}
 
 _PRICE_CACHE: Dict[str, Dict] = {}
 _PRICE_TASK: Optional[asyncio.Task] = None
@@ -263,37 +265,86 @@ async def sweep_to_treasury(user_doc: dict) -> Optional[float]:
 
 # ---------------- Price polling ----------------
 async def fetch_prices_once():
-    ids = ",".join({m["id"] for m in PAIRS.values()})
-    url = f"https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies=usd&include_24hr_change=true"
+    """Fetch all tradeable pair prices from DexScreener (Solana memecoins) plus SOL/USD from CoinGecko."""
+    addresses = ",".join(p["mint"] for p in PAIRS_LIST)
     try:
-        async with httpx.AsyncClient(timeout=10) as cx:
-            r = await cx.get(url)
-            if r.status_code != 200:
-                return
-            data = r.json()
-            for pair, meta in PAIRS.items():
-                p = data.get(meta["id"])
-                if p and "usd" in p:
-                    _PRICE_CACHE[pair] = {
-                        "pair": pair,
-                        "symbol": meta["sym"],
-                        "price": float(p["usd"]),
-                        "change_24h": float(p.get("usd_24h_change") or 0),
+        async with httpx.AsyncClient(timeout=15) as cx:
+            # 1. DexScreener for memecoins
+            r = await cx.get(f"https://api.dexscreener.com/tokens/v1/solana/{addresses}")
+            if r.status_code == 200:
+                data = r.json() or []
+                # group by base token mint, keep highest-liquidity pair per mint
+                by_mint = {}
+                for d in data:
+                    base = (d.get("baseToken") or {}).get("address")
+                    if not base:
+                        continue
+                    liq = float(((d.get("liquidity") or {}).get("usd") or 0))
+                    if base not in by_mint or liq > by_mint[base]["_liq"]:
+                        d["_liq"] = liq
+                        by_mint[base] = d
+                for p in PAIRS_LIST:
+                    d = by_mint.get(p["mint"])
+                    if not d:
+                        continue
+                    key = f'{p["sym"]}/USD'
+                    try:
+                        price = float(d.get("priceUsd") or 0)
+                    except Exception:
+                        price = 0.0
+                    chg = float(((d.get("priceChange") or {}).get("h24") or 0))
+                    vol = float(((d.get("volume") or {}).get("h24") or 0))
+                    pair_addr = d.get("pairAddress")
+                    dex_id = d.get("dexId")
+                    _PRICE_CACHE[key] = {
+                        "pair": key,
+                        "symbol": p["sym"],
+                        "mint": p["mint"],
+                        "price": price,
+                        "change_24h": chg,
+                        "volume_24h": vol,
+                        "dex_id": dex_id,
+                        "pair_address": pair_addr,
                         "updated_at": now().isoformat(),
                     }
+            else:
+                log.warning("dexscreener %s", r.status_code)
+
+            # 2. SOL/USD from CoinGecko (used internally for deposit conversion only)
+            try:
+                rs = await cx.get("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd&include_24hr_change=true")
+                if rs.status_code == 200:
+                    j = rs.json().get("solana") or {}
+                    if "usd" in j:
+                        _PRICE_CACHE["SOL/USD"] = {
+                            "pair": "SOL/USD",
+                            "symbol": "SOL",
+                            "price": float(j["usd"]),
+                            "change_24h": float(j.get("usd_24h_change") or 0),
+                            "updated_at": now().isoformat(),
+                        }
+            except Exception as e:
+                log.warning("sol price fetch failed: %s", e)
     except Exception as e:
         log.warning("price fetch failed: %s", e)
 
 async def price_loop():
-    fallbacks = {
-        "SOL/USD": 178.42, "BTC/USD": 67420.18, "ETH/USD": 3580.04,
-        "BONK/USD": 0.0000234, "WIF/USD": 2.31, "JUP/USD": 0.84, "PEPE/USD": 0.00001324,
+    # seed fallbacks so UI never empty before first fetch
+    fallback_price = {
+        "ANSEM": 0.012, "JUPITER": 0.85, "CARDS": 0.004, "KINS": 0.001,
+        "TRIPLET": 0.0008, "JOTCHUA": 0.002, "WORLD": 0.0015, "DROOL": 0.0006,
     }
-    for k, v in fallbacks.items():
-        _PRICE_CACHE.setdefault(k, {
-            "pair": k, "symbol": PAIRS[k]["sym"], "price": v,
+    for p in PAIRS_LIST:
+        key = f'{p["sym"]}/USD'
+        _PRICE_CACHE.setdefault(key, {
+            "pair": key, "symbol": p["sym"], "mint": p["mint"],
+            "price": fallback_price.get(p["sym"], 0.001),
             "change_24h": 0.0, "updated_at": now().isoformat(),
         })
+    _PRICE_CACHE.setdefault("SOL/USD", {
+        "pair": "SOL/USD", "symbol": "SOL", "price": 178.42,
+        "change_24h": 0.0, "updated_at": now().isoformat(),
+    })
     while True:
         await fetch_prices_once()
         await asyncio.sleep(20)
@@ -414,7 +465,8 @@ async def me(x_privy_id: str = Header(...)):
 # ---------------- Routes: markets ----------------
 @api.get("/markets/prices")
 async def market_prices():
-    return {"prices": list(_PRICE_CACHE.values())}
+    # Only return tradeable pairs (exclude SOL/USD which is internal)
+    return {"prices": [p for k, p in _PRICE_CACHE.items() if k in PAIRS]}
 
 @api.get("/markets/price/{pair_path:path}")
 async def market_price(pair_path: str):
@@ -836,11 +888,10 @@ async def token_info():
         "chain": "Solana",
         "total_supply": 1_000_000_000,
         "tokenomics": [
-            {"label": "LOCKED",            "pct": 50, "amount": 500_000_000, "color": "#ff3838"},
-            {"label": "REWARDS / GIVEAWAYS", "pct": 10, "amount": 100_000_000, "color": "#ffe93d"},
-            {"label": "REAL COMPETITION",  "pct": 7,  "amount":  70_000_000, "color": "#00FF29"},
-            {"label": "PAPER COMPETITION", "pct": 3,  "amount":  30_000_000, "color": "#13b84d"},
-            {"label": "FAIR LAUNCH",       "pct": 30, "amount": 300_000_000, "color": "#F5F5F5"},
+            {"label": "LOCKED",          "pct": 50, "amount": 500_000_000, "color": "#ff3838"},
+            {"label": "REAL REWARDS",    "pct": 7,  "amount":  70_000_000, "color": "#00FF29"},
+            {"label": "PAPER REWARDS",   "pct": 3,  "amount":  30_000_000, "color": "#13b84d"},
+            {"label": "PUBLIC LAUNCH",   "pct": 40, "amount": 400_000_000, "color": "#F5F5F5"},
         ],
     }
 

@@ -6,10 +6,9 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const ICONS = {
   'LOCKED': Lock,
-  'REWARDS / GIVEAWAYS': Gift,
-  'REAL COMPETITION': Swords,
-  'PAPER COMPETITION': Swords,
-  'FAIR LAUNCH': Rocket,
+  'REAL REWARDS': Swords,
+  'PAPER REWARDS': Swords,
+  'PUBLIC LAUNCH': Rocket,
 };
 
 function formatN(n) {
@@ -67,7 +66,7 @@ export default function TokenSection() {
         </div>
 
         {/* Tokenomics grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           {info.tokenomics.map(t => {
             const Icon = ICONS[t.label] || Coins;
             return (

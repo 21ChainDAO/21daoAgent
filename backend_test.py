@@ -1,395 +1,513 @@
-#!/usr/bin/env python3
 """
-Comprehensive backend test for Degens.bet withdrawal fix verification
-Tests auto-to-manual withdrawal fallback when TREASURY_PRIVKEY is empty
+Backend API tests for Degens.bet - Trading Pairs Swap Testing
+Tests the new 8 Solana memecoin pairs (DexScreener) vs old 7 majors (CoinGecko)
 """
+import httpx
+import os
+from dotenv import load_dotenv
 
-import requests
-import json
-from pymongo import MongoClient
+load_dotenv("/app/frontend/.env")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://terminal-degen.preview.emergentagent.com")
+API_URL = f"{BASE_URL}/api"
 
-# Configuration
-BACKEND_URL = "https://terminal-degen.preview.emergentagent.com/api"
-TEST_PRIVY_ID = "wd_test_1"
-TEST_WALLET_ADDRESS = "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
-MONGO_URL = "mongodb://localhost:27017"
-DB_NAME = "test_database"
+# Expected new pairs
+EXPECTED_PAIRS = ["ANSEM/USD", "JUPITER/USD", "CARDS/USD", "KINS/USD", 
+                  "TRIPLET/USD", "JOTCHUA/USD", "WORLD/USD", "DROOL/USD"]
 
-# MongoDB client
-client = MongoClient(MONGO_URL)
-db = client[DB_NAME]
+# Expected mint addresses
+EXPECTED_MINTS = {
+    "ANSEM": "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump",
+    "JUPITER": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+    "CARDS": "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp",
+    "KINS": "Tqj8yFmagrg7oorpQkVGYR52r96RFTamvWfth9bpump",
+    "TRIPLET": "J8PSdNP3QewKq2Z1JJJFDMaqF7KcaiJhR7gbr5KZpump",
+    "JOTCHUA": "BcHEaaTCvycPwwsJ9yQTXdHP9X2gCLkznDbZ8VySpump",
+    "WORLD": "FMqh9mqR6drPZqqW6wPqLHxX4rqNDWGhYLaMfoaJpump",
+    "DROOL": "B6f27ETGcjgGNB1fqULJbXVmw9FnL8HgBp7R83hmpump",
+}
 
-def print_section(title):
-    print(f"\n{'='*80}")
-    print(f"  {title}")
-    print(f"{'='*80}\n")
+def test_1_pairs_list_and_live_data():
+    """Test 1: GET /api/markets/prices returns EXACTLY 8 pairs with correct structure"""
+    print("\n=== TEST 1: Pairs list & live data ===")
+    r = httpx.get(f"{API_URL}/markets/prices", timeout=30)
+    print(f"Status: {r.status_code}")
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+    
+    data = r.json()
+    assert "prices" in data, "Response missing 'prices' key"
+    prices = data["prices"]
+    
+    # Must be EXACTLY 8 pairs
+    print(f"Number of pairs: {len(prices)}")
+    assert len(prices) == 8, f"Expected EXACTLY 8 pairs, got {len(prices)}"
+    
+    # Check each pair
+    found_pairs = []
+    for p in prices:
+        print(f"\nPair: {p.get('pair')}")
+        print(f"  Symbol: {p.get('symbol')}")
+        print(f"  Mint: {p.get('mint')}")
+        print(f"  Price: {p.get('price')}")
+        print(f"  Change 24h: {p.get('change_24h')}")
+        print(f"  Updated at: {p.get('updated_at')}")
+        
+        # Required fields
+        assert "pair" in p, "Missing 'pair' field"
+        assert "symbol" in p, "Missing 'symbol' field"
+        assert "mint" in p, "Missing 'mint' field"
+        assert "price" in p, "Missing 'price' field"
+        assert "change_24h" in p, "Missing 'change_24h' field"
+        assert "updated_at" in p, "Missing 'updated_at' field"
+        
+        # Price validation (>= 0, ideally > 0)
+        assert isinstance(p["price"], (int, float)), f"Price must be numeric, got {type(p['price'])}"
+        assert p["price"] >= 0, f"Price must be >= 0, got {p['price']}"
+        
+        # Change validation
+        assert isinstance(p["change_24h"], (int, float)), f"Change must be numeric, got {type(p['change_24h'])}"
+        
+        # Verify mint address matches expected
+        symbol = p["symbol"]
+        if symbol in EXPECTED_MINTS:
+            expected_mint = EXPECTED_MINTS[symbol]
+            assert p["mint"] == expected_mint, f"Mint mismatch for {symbol}: expected {expected_mint}, got {p['mint']}"
+        
+        found_pairs.append(p["pair"])
+    
+    # Verify all expected pairs are present
+    for expected in EXPECTED_PAIRS:
+        assert expected in found_pairs, f"Missing expected pair: {expected}"
+    
+    # CRITICAL: SOL/USD must NOT be in the list
+    assert "SOL/USD" not in found_pairs, "SOL/USD should NOT appear in /api/markets/prices (internal only)"
+    
+    print("\n✅ TEST 1 PASSED: All 8 pairs present with correct structure, SOL/USD not in list")
+    return True
 
-def print_result(test_name, passed, details=""):
-    status = "✅ PASS" if passed else "❌ FAIL"
-    print(f"{status} - {test_name}")
-    if details:
-        print(f"    {details}")
+def test_2_single_pair_lookup():
+    """Test 2: Single pair lookup for ANSEM/USD and SOL/USD"""
+    print("\n=== TEST 2: Single pair lookup ===")
+    
+    # Test ANSEM/USD
+    print("\nTesting GET /api/markets/price/ANSEM/USD")
+    r = httpx.get(f"{API_URL}/markets/price/ANSEM/USD", timeout=30)
+    print(f"Status: {r.status_code}")
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+    
+    data = r.json()
+    print(f"Response: {data}")
+    assert data["pair"] == "ANSEM/USD", f"Expected pair ANSEM/USD, got {data.get('pair')}"
+    assert data["symbol"] == "ANSEM", f"Expected symbol ANSEM, got {data.get('symbol')}"
+    assert data["mint"] == EXPECTED_MINTS["ANSEM"], f"Mint mismatch"
+    assert "price" in data and isinstance(data["price"], (int, float)), "Missing or invalid price"
+    
+    # Test SOL/USD (must still work for internal use)
+    print("\nTesting GET /api/markets/price/SOL/USD (internal)")
+    r = httpx.get(f"{API_URL}/markets/price/SOL/USD", timeout=30)
+    print(f"Status: {r.status_code}")
+    assert r.status_code == 200, f"SOL/USD must still work for internal use, got {r.status_code}"
+    
+    data = r.json()
+    print(f"Response: {data}")
+    assert data["pair"] == "SOL/USD", f"Expected pair SOL/USD, got {data.get('pair')}"
+    assert data["symbol"] == "SOL", f"Expected symbol SOL, got {data.get('symbol')}"
+    assert "price" in data and isinstance(data["price"], (int, float)), "Missing or invalid price"
+    assert data["price"] > 50, f"SOL price sanity check failed: {data['price']} (expected > $50)"
+    
+    print("\n✅ TEST 2 PASSED: Single pair lookup works for ANSEM/USD and SOL/USD")
+    return True
 
-def reset_test_user():
-    """Reset test user in MongoDB"""
-    print_section("STEP 1: Reset Test User in MongoDB")
+def test_3_trade_flow_on_new_pairs():
+    """Test 3: Trade flow on new pairs (ANSEM/USD)"""
+    print("\n=== TEST 3: Trade flow on new pairs ===")
     
-    # Find user
-    user = db.users.find_one({"privy_id": TEST_PRIVY_ID})
-    if not user:
-        print(f"❌ User with privy_id={TEST_PRIVY_ID} not found in database")
-        return False
-    
-    user_id = user["id"]
-    print(f"Found user: {user.get('x_handle', 'N/A')} (id={user_id})")
-    
-    # Delete all withdrawals for this user
-    result = db.withdrawals.delete_many({"user_id": user_id})
-    print(f"Deleted {result.deleted_count} withdrawal records")
-    
-    # Update user fields
-    db.users.update_one(
-        {"privy_id": TEST_PRIVY_ID},
-        {"$set": {
-            "real.balance": 750.0,
-            "total_sol_deposited": 1.0,
-            "total_sol_withdrawn_auto": 0
-        }}
-    )
-    print(f"Set real.balance=750.0, total_sol_deposited=1.0, total_sol_withdrawn_auto=0")
-    
-    # Verify via API
-    headers = {"X-Privy-Id": TEST_PRIVY_ID}
-    resp = requests.get(f"{BACKEND_URL}/users/me", headers=headers)
-    if resp.status_code == 200:
-        data = resp.json()
-        real_balance = data.get("real", {}).get("balance", 0)
-        total_deposited = data.get("total_sol_deposited", 0)
-        total_withdrawn = data.get("total_sol_withdrawn_auto", 0)
-        print(f"\nVerified via GET /api/users/me:")
-        print(f"  real.balance: {real_balance}")
-        print(f"  total_sol_deposited: {total_deposited}")
-        print(f"  total_sol_withdrawn_auto: {total_withdrawn}")
-        return True
-    else:
-        print(f"❌ Failed to verify user via API: {resp.status_code}")
-        return False
-
-def test_auto_eligible_withdrawal():
-    """Test auto-eligible withdrawal (0.5 SOL) - should convert cleanly to manual"""
-    print_section("STEP 2: Auto-Eligible Withdrawal (0.5 SOL)")
-    
-    headers = {"X-Privy-Id": TEST_PRIVY_ID}
-    
-    # Get initial balance
-    resp = requests.get(f"{BACKEND_URL}/users/me", headers=headers)
-    initial_balance = resp.json().get("real", {}).get("balance", 0)
-    print(f"Initial real.balance: ${initial_balance:.2f}")
-    
-    # Get SOL price
-    resp = requests.get(f"{BACKEND_URL}/markets/price/SOL/USD")
-    sol_price = resp.json().get("price", 150)
-    print(f"Current SOL price: ${sol_price:.2f}")
-    
-    expected_deduction = 0.5 * sol_price
-    expected_balance = initial_balance - expected_deduction
-    print(f"Expected balance after 0.5 SOL withdrawal: ${expected_balance:.2f} (±$5)")
-    
-    # Make withdrawal request
-    payload = {
-        "to_address": TEST_WALLET_ADDRESS,
-        "amount_sol": 0.5
+    # Create test user
+    print("\nCreating test user...")
+    user_data = {
+        "privy_id": "pair_test_1",
+        "x_handle": "pair_test",
+        "x_name": "Pair Test User",
     }
-    resp = requests.post(f"{BACKEND_URL}/wallet/withdraw_request", headers=headers, json=payload)
+    r = httpx.post(f"{API_URL}/users/upsert", json=user_data, timeout=30)
+    print(f"Status: {r.status_code}")
+    assert r.status_code == 200, f"User creation failed: {r.status_code}"
+    user = r.json()
+    print(f"User created: {user.get('privy_id')}")
     
-    if resp.status_code != 200:
-        print_result("Withdrawal request", False, f"Status {resp.status_code}: {resp.text}")
-        return False
+    # Get current ANSEM price for validation
+    r = httpx.get(f"{API_URL}/markets/price/ANSEM/USD", timeout=30)
+    ansem_price = r.json()["price"]
+    print(f"Current ANSEM price: ${ansem_price}")
     
-    data = resp.json()
-    print(f"\nWithdrawal response:")
-    print(json.dumps(data, indent=2))
-    
-    # Verify response structure
-    tests_passed = []
-    
-    # Check auto is null
-    if data.get("auto") is None:
-        print_result("auto field is null", True)
-        tests_passed.append(True)
-    else:
-        print_result("auto field is null", False, f"Expected null, got {data.get('auto')}")
-        tests_passed.append(False)
-    
-    # Check manual exists
-    manual = data.get("manual")
-    if manual and manual.get("kind") == "manual" and manual.get("status") == "pending" and manual.get("amount_sol") == 0.5:
-        print_result("manual field correct", True, f"kind=manual, status=pending, amount_sol=0.5")
-        tests_passed.append(True)
-    else:
-        print_result("manual field correct", False, f"Got: {manual}")
-        tests_passed.append(False)
-    
-    # Check auto_sol and manual_sol
-    if data.get("auto_sol") == 0 and data.get("manual_sol") == 0.5:
-        print_result("auto_sol=0, manual_sol=0.5", True)
-        tests_passed.append(True)
-    else:
-        print_result("auto_sol=0, manual_sol=0.5", False, f"Got auto_sol={data.get('auto_sol')}, manual_sol={data.get('manual_sol')}")
-        tests_passed.append(False)
-    
-    # Check balance deduction
-    resp = requests.get(f"{BACKEND_URL}/users/me", headers=headers)
-    new_balance = resp.json().get("real", {}).get("balance", 0)
-    print(f"\nNew real.balance: ${new_balance:.2f}")
-    
-    balance_diff = abs(new_balance - expected_balance)
-    if balance_diff <= 5:
-        print_result("Balance deducted correctly", True, f"Expected ~${expected_balance:.2f}, got ${new_balance:.2f} (diff: ${balance_diff:.2f})")
-        tests_passed.append(True)
-    else:
-        print_result("Balance deducted correctly", False, f"Expected ~${expected_balance:.2f}, got ${new_balance:.2f} (diff: ${balance_diff:.2f})")
-        tests_passed.append(False)
-    
-    # Check withdrawal records
-    resp = requests.get(f"{BACKEND_URL}/wallet/withdrawals/me", headers=headers)
-    withdrawals = resp.json().get("withdrawals", [])
-    print(f"\nWithdrawal records count: {len(withdrawals)}")
-    
-    if len(withdrawals) == 1:
-        wd = withdrawals[0]
-        if wd.get("kind") == "manual" and wd.get("status") == "pending" and wd.get("amount_sol") == 0.5:
-            print_result("Exactly 1 manual withdrawal record", True, f"kind=manual, status=pending, amount_sol=0.5")
-            tests_passed.append(True)
-        else:
-            print_result("Exactly 1 manual withdrawal record", False, f"Record: {wd}")
-            tests_passed.append(False)
-    else:
-        print_result("Exactly 1 manual withdrawal record", False, f"Found {len(withdrawals)} records")
-        tests_passed.append(False)
-        if withdrawals:
-            print("Records found:")
-            for wd in withdrawals:
-                print(f"  - kind={wd.get('kind')}, status={wd.get('status')}, amount_sol={wd.get('amount_sol')}")
-    
-    # Check no auto_failed records
-    auto_failed = [w for w in withdrawals if w.get("kind") == "auto" and w.get("status") == "failed"]
-    if len(auto_failed) == 0:
-        print_result("No auto_failed records", True)
-        tests_passed.append(True)
-    else:
-        print_result("No auto_failed records", False, f"Found {len(auto_failed)} auto_failed records")
-        tests_passed.append(False)
-    
-    return all(tests_passed)
-
-def test_mixed_withdrawal():
-    """Test mixed withdrawal (1.4 SOL = 1 auto + 0.4 profit)"""
-    print_section("STEP 3: Mixed Withdrawal (1.4 SOL)")
-    
-    # Reset user first
-    user = db.users.find_one({"privy_id": TEST_PRIVY_ID})
-    user_id = user["id"]
-    db.withdrawals.delete_many({"user_id": user_id})
-    db.users.update_one(
-        {"privy_id": TEST_PRIVY_ID},
-        {"$set": {
-            "real.balance": 750.0,
-            "total_sol_withdrawn_auto": 0
-        }}
-    )
-    print("Reset: deleted withdrawals, set real.balance=750, total_sol_withdrawn_auto=0")
-    
-    headers = {"X-Privy-Id": TEST_PRIVY_ID}
-    
-    # Get initial balance
-    resp = requests.get(f"{BACKEND_URL}/users/me", headers=headers)
-    initial_balance = resp.json().get("real", {}).get("balance", 0)
-    print(f"Initial real.balance: ${initial_balance:.2f}")
-    
-    # Get SOL price
-    resp = requests.get(f"{BACKEND_URL}/markets/price/SOL/USD")
-    sol_price = resp.json().get("price", 150)
-    print(f"Current SOL price: ${sol_price:.2f}")
-    
-    expected_deduction = 1.4 * sol_price
-    expected_balance = initial_balance - expected_deduction
-    print(f"Expected balance after 1.4 SOL withdrawal: ${expected_balance:.2f}")
-    
-    # Make withdrawal request
-    payload = {
-        "to_address": TEST_WALLET_ADDRESS,
-        "amount_sol": 1.4
+    # Open paper position on ANSEM/USD
+    print("\nOpening paper position on ANSEM/USD...")
+    position_data = {
+        "pair": "ANSEM/USD",
+        "side": "long",
+        "margin": 200,
+        "leverage": 5,
+        "account_type": "paper"
     }
-    resp = requests.post(f"{BACKEND_URL}/wallet/withdraw_request", headers=headers, json=payload)
+    headers = {"X-Privy-Id": "pair_test_1"}
+    r = httpx.post(f"{API_URL}/positions/open", json=position_data, headers=headers, timeout=30)
+    print(f"Status: {r.status_code}")
+    assert r.status_code == 200, f"Position open failed: {r.status_code}"
     
-    if resp.status_code != 200:
-        print_result("Withdrawal request", False, f"Status {resp.status_code}: {resp.text}")
-        return False
+    pos = r.json()
+    print(f"Position opened: {pos.get('id')}")
+    print(f"  Pair: {pos.get('pair')}")
+    print(f"  Side: {pos.get('side')}")
+    print(f"  Margin: {pos.get('margin')}")
+    print(f"  Leverage: {pos.get('leverage')}")
+    print(f"  Size: {pos.get('size')}")
+    print(f"  Entry price: {pos.get('entry_price')}")
+    print(f"  Status: {pos.get('status')}")
     
-    data = resp.json()
-    print(f"\nWithdrawal response:")
-    print(json.dumps(data, indent=2))
+    # Verify position
+    assert pos["pair"] == "ANSEM/USD", f"Expected pair ANSEM/USD, got {pos.get('pair')}"
+    assert pos["side"] == "long", f"Expected side long, got {pos.get('side')}"
+    assert pos["margin"] == 200, f"Expected margin 200, got {pos.get('margin')}"
+    assert pos["leverage"] == 5, f"Expected leverage 5, got {pos.get('leverage')}"
+    assert pos["size"] == 1000, f"Expected size 1000 (200*5), got {pos.get('size')}"
+    assert pos["status"] == "open", f"Expected status open, got {pos.get('status')}"
     
-    tests_passed = []
+    # Verify entry price is close to current ANSEM price (±5%)
+    entry_price = pos["entry_price"]
+    assert entry_price > 0, f"Entry price must be > 0, got {entry_price}"
+    price_diff_pct = abs(entry_price - ansem_price) / ansem_price * 100
+    print(f"  Price difference: {price_diff_pct:.2f}%")
+    assert price_diff_pct <= 5, f"Entry price {entry_price} differs from current price {ansem_price} by {price_diff_pct:.2f}% (expected ±5%)"
     
-    # Check auto_sol=0, manual_sol=1.4
-    if data.get("auto_sol") == 0 and data.get("manual_sol") == 1.4:
-        print_result("auto_sol=0, manual_sol=1.4", True)
-        tests_passed.append(True)
-    else:
-        print_result("auto_sol=0, manual_sol=1.4", False, f"Got auto_sol={data.get('auto_sol')}, manual_sol={data.get('manual_sol')}")
-        tests_passed.append(False)
+    # Get open positions
+    print("\nGetting open positions...")
+    r = httpx.get(f"{API_URL}/positions/me?account_type=paper&status=open", headers=headers, timeout=30)
+    print(f"Status: {r.status_code}")
+    assert r.status_code == 200, f"Get positions failed: {r.status_code}"
     
-    # Check balance deduction
-    resp = requests.get(f"{BACKEND_URL}/users/me", headers=headers)
-    new_balance = resp.json().get("real", {}).get("balance", 0)
-    print(f"\nNew real.balance: ${new_balance:.2f}")
+    data = r.json()
+    positions = data.get("positions", [])
+    print(f"Open positions: {len(positions)}")
+    assert len(positions) > 0, "Expected at least 1 open position"
     
-    balance_diff = abs(new_balance - expected_balance)
-    if balance_diff <= 5:
-        print_result("Balance deducted by 1.4*sol_price", True, f"Expected ~${expected_balance:.2f}, got ${new_balance:.2f}")
-        tests_passed.append(True)
-    else:
-        print_result("Balance deducted by 1.4*sol_price", False, f"Expected ~${expected_balance:.2f}, got ${new_balance:.2f}")
-        tests_passed.append(False)
+    # Find our position
+    our_pos = next((p for p in positions if p["id"] == pos["id"]), None)
+    assert our_pos is not None, "Our position not found in open positions"
     
-    # Check exactly 1 withdrawal record
-    resp = requests.get(f"{BACKEND_URL}/wallet/withdrawals/me", headers=headers)
-    withdrawals = resp.json().get("withdrawals", [])
+    # Verify mark_price and unrealized_pnl are populated
+    print(f"  Mark price: {our_pos.get('mark_price')}")
+    print(f"  Unrealized PnL: {our_pos.get('unrealized_pnl')}")
+    assert "mark_price" in our_pos, "Missing mark_price"
+    assert "unrealized_pnl" in our_pos, "Missing unrealized_pnl"
+    assert isinstance(our_pos["mark_price"], (int, float)), "mark_price must be numeric"
+    assert isinstance(our_pos["unrealized_pnl"], (int, float)), "unrealized_pnl must be numeric"
     
-    if len(withdrawals) == 1:
-        wd = withdrawals[0]
-        if wd.get("kind") == "manual" and wd.get("amount_sol") == 1.4:
-            print_result("Exactly 1 manual withdrawal (1.4 SOL)", True)
-            tests_passed.append(True)
+    print("\n✅ TEST 3 PASSED: Trade flow on ANSEM/USD works correctly")
+    return True
+
+def test_4_old_pair_rejection():
+    """Test 4: Opening position on old pair (BTC/USD) must fail"""
+    print("\n=== TEST 4: Old pair rejection ===")
+    
+    print("\nAttempting to open position on BTC/USD (old pair)...")
+    position_data = {
+        "pair": "BTC/USD",
+        "side": "long",
+        "margin": 100,
+        "leverage": 10,
+        "account_type": "paper"
+    }
+    headers = {"X-Privy-Id": "pair_test_1"}
+    r = httpx.post(f"{API_URL}/positions/open", json=position_data, headers=headers, timeout=30)
+    print(f"Status: {r.status_code}")
+    
+    # Must return 400
+    assert r.status_code == 400, f"Expected 400 for unsupported pair, got {r.status_code}"
+    
+    error = r.json()
+    print(f"Error response: {error}")
+    assert "detail" in error, "Missing error detail"
+    assert "unsupported pair" in error["detail"].lower(), f"Expected 'unsupported pair' error, got: {error['detail']}"
+    
+    print("\n✅ TEST 4 PASSED: Old pair BTC/USD correctly rejected with 400")
+    return True
+
+def test_5_token_endpoint_new_tokenomics():
+    """Test 5: Token endpoint with new tokenomics (4 entries)"""
+    print("\n=== TEST 5: Token endpoint with new tokenomics ===")
+    
+    r = httpx.get(f"{API_URL}/token", timeout=30)
+    print(f"Status: {r.status_code}")
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+    
+    data = r.json()
+    print(f"Response: {data}")
+    
+    # Verify basic fields
+    assert data["symbol"] == "dBET", f"Expected symbol dBET, got {data.get('symbol')}"
+    assert data["total_supply"] == 1_000_000_000, f"Expected total_supply 1B, got {data.get('total_supply')}"
+    
+    # Verify tokenomics
+    assert "tokenomics" in data, "Missing tokenomics"
+    tokenomics = data["tokenomics"]
+    
+    # Must be EXACTLY 4 entries (not 5)
+    print(f"\nTokenomics entries: {len(tokenomics)}")
+    assert len(tokenomics) == 4, f"Expected EXACTLY 4 tokenomics entries, got {len(tokenomics)}"
+    
+    # Expected entries
+    expected = [
+        {"label": "LOCKED", "pct": 50, "amount": 500_000_000},
+        {"label": "REAL REWARDS", "pct": 7, "amount": 70_000_000},
+        {"label": "PAPER REWARDS", "pct": 3, "amount": 30_000_000},
+        {"label": "PUBLIC LAUNCH", "pct": 40, "amount": 400_000_000},
+    ]
+    
+    total_pct = 0
+    total_amount = 0
+    
+    for i, entry in enumerate(tokenomics):
+        print(f"\nEntry {i+1}:")
+        print(f"  Label: {entry.get('label')}")
+        print(f"  Percentage: {entry.get('pct')}%")
+        print(f"  Amount: {entry.get('amount'):,}")
+        
+        # Verify against expected
+        exp = expected[i]
+        assert entry["label"] == exp["label"], f"Expected label {exp['label']}, got {entry.get('label')}"
+        assert entry["pct"] == exp["pct"], f"Expected pct {exp['pct']}, got {entry.get('pct')}"
+        assert entry["amount"] == exp["amount"], f"Expected amount {exp['amount']}, got {entry.get('amount')}"
+        
+        total_pct += entry["pct"]
+        total_amount += entry["amount"]
+    
+    # Verify totals
+    print(f"\nTotal percentage: {total_pct}%")
+    print(f"Total amount: {total_amount:,}")
+    assert total_pct == 100, f"Total percentage must be 100%, got {total_pct}%"
+    assert total_amount == 1_000_000_000, f"Total amount must be 1B, got {total_amount:,}"
+    
+    print("\n✅ TEST 5 PASSED: Token endpoint returns 4 tokenomics entries with correct values")
+    return True
+
+def test_6_competitions_prizes_intact():
+    """Test 6: Competition prizes still intact"""
+    print("\n=== TEST 6: Competition prizes still intact ===")
+    
+    r = httpx.get(f"{API_URL}/competitions", timeout=30)
+    print(f"Status: {r.status_code}")
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+    
+    data = r.json()
+    assert "competitions" in data, "Missing competitions"
+    competitions = data["competitions"]
+    
+    print(f"Number of competitions: {len(competitions)}")
+    assert len(competitions) >= 2, f"Expected at least 2 competitions, got {len(competitions)}"
+    
+    # Find paper-main and real-main
+    paper_comp = next((c for c in competitions if c["id"] == "paper-main"), None)
+    real_comp = next((c for c in competitions if c["id"] == "real-main"), None)
+    
+    assert paper_comp is not None, "paper-main competition not found"
+    assert real_comp is not None, "real-main competition not found"
+    
+    # Verify paper-main
+    print("\nPaper competition:")
+    print(f"  ID: {paper_comp['id']}")
+    print(f"  Entry fee: {paper_comp.get('entry_fee_sol')} SOL")
+    print(f"  Prize pool USD: ${paper_comp.get('prize_pool_usd'):,}")
+    print(f"  Prize pool dBET: {paper_comp.get('prize_pool_dbet'):,}")
+    print(f"  Status: {paper_comp.get('status')}")
+    
+    assert paper_comp["entry_fee_sol"] == 1.0, f"Expected entry_fee_sol 1.0, got {paper_comp.get('entry_fee_sol')}"
+    assert paper_comp["prize_pool_usd"] == 10000, f"Expected prize_pool_usd 10000, got {paper_comp.get('prize_pool_usd')}"
+    assert paper_comp["prize_pool_dbet"] == 30_000_000, f"Expected prize_pool_dbet 30M, got {paper_comp.get('prize_pool_dbet')}"
+    assert paper_comp["status"] == "open", f"Expected status open, got {paper_comp.get('status')}"
+    assert "prize_structure" in paper_comp, "Missing prize_structure"
+    
+    # Verify real-main
+    print("\nReal competition:")
+    print(f"  ID: {real_comp['id']}")
+    print(f"  Entry fee: {real_comp.get('entry_fee_sol')} SOL")
+    print(f"  Prize pool USD: ${real_comp.get('prize_pool_usd'):,}")
+    print(f"  Prize pool dBET: {real_comp.get('prize_pool_dbet'):,}")
+    print(f"  Status: {real_comp.get('status')}")
+    
+    assert real_comp["entry_fee_sol"] == 10.0, f"Expected entry_fee_sol 10.0, got {real_comp.get('entry_fee_sol')}"
+    assert real_comp["prize_pool_usd"] == 100000, f"Expected prize_pool_usd 100000, got {real_comp.get('prize_pool_usd')}"
+    assert real_comp["prize_pool_dbet"] == 70_000_000, f"Expected prize_pool_dbet 70M, got {real_comp.get('prize_pool_dbet')}"
+    assert real_comp["status"] == "open", f"Expected status open, got {real_comp.get('status')}"
+    assert "prize_structure" in real_comp, "Missing prize_structure"
+    
+    print("\n✅ TEST 6 PASSED: Both competitions present with correct dBET prizes (30M/70M)")
+    return True
+
+def test_7_deposit_conversion_works():
+    """Test 7: Deposit conversion still works (needs SOL/USD internally)"""
+    print("\n=== TEST 7: Deposit conversion still works ===")
+    
+    # Create user with custodial address
+    print("\nCreating user for deposit test...")
+    user_data = {
+        "privy_id": "deposit_test_1",
+        "x_handle": "deposit_test",
+    }
+    r = httpx.post(f"{API_URL}/users/upsert", json=user_data, timeout=30)
+    print(f"Status: {r.status_code}")
+    assert r.status_code == 200, f"User creation failed: {r.status_code}"
+    
+    user = r.json()
+    print(f"User created: {user.get('privy_id')}")
+    print(f"Custodial address: {user.get('custodial_address')}")
+    assert "custodial_address" in user, "Missing custodial_address"
+    assert user["custodial_address"] is not None, "custodial_address is None"
+    
+    # Verify SOL/USD price is available internally
+    print("\nVerifying SOL/USD price for deposit conversion...")
+    r = httpx.get(f"{API_URL}/markets/price/SOL/USD", timeout=30)
+    print(f"Status: {r.status_code}")
+    assert r.status_code == 200, f"SOL/USD price not available: {r.status_code}"
+    
+    sol_data = r.json()
+    sol_price = sol_data["price"]
+    print(f"SOL/USD price: ${sol_price}")
+    
+    # Sanity check: SOL price should be > $50
+    assert sol_price > 50, f"SOL price sanity check failed: ${sol_price} (expected > $50)"
+    
+    print("\n✅ TEST 7 PASSED: Deposit conversion infrastructure works (SOL/USD available internally)")
+    return True
+
+def test_8_regression_tests():
+    """Test 8: Regression tests"""
+    print("\n=== TEST 8: Regression tests ===")
+    
+    # Test landing stats
+    print("\nTesting GET /api/stats/landing...")
+    r = httpx.get(f"{API_URL}/stats/landing", timeout=30)
+    print(f"Status: {r.status_code}")
+    assert r.status_code == 200, f"Landing stats failed: {r.status_code}"
+    
+    data = r.json()
+    print(f"Response: {data}")
+    
+    # Verify all required fields are numeric
+    required_fields = ["users", "trades", "total_volume", "monthly_volume", "max_leverage", "uptime"]
+    for field in required_fields:
+        assert field in data, f"Missing field: {field}"
+        assert isinstance(data[field], (int, float)), f"Field {field} must be numeric, got {type(data[field])}"
+    
+    print("✅ Landing stats working")
+    
+    # Test leaderboard
+    print("\nTesting GET /api/leaderboard/paper...")
+    r = httpx.get(f"{API_URL}/leaderboard/paper", timeout=30)
+    print(f"Status: {r.status_code}")
+    assert r.status_code == 200, f"Leaderboard failed: {r.status_code}"
+    
+    data = r.json()
+    assert "leaderboard" in data, "Missing leaderboard"
+    assert isinstance(data["leaderboard"], list), "Leaderboard must be array"
+    print(f"Leaderboard entries: {len(data['leaderboard'])}")
+    print("✅ Leaderboard working")
+    
+    # Test user upsert idempotency
+    print("\nTesting POST /api/users/upsert idempotency...")
+    user_data = {
+        "privy_id": "regression_test_1",
+        "x_handle": "regression_test",
+    }
+    r1 = httpx.post(f"{API_URL}/users/upsert", json=user_data, timeout=30)
+    assert r1.status_code == 200, f"First upsert failed: {r1.status_code}"
+    user1 = r1.json()
+    
+    r2 = httpx.post(f"{API_URL}/users/upsert", json=user_data, timeout=30)
+    assert r2.status_code == 200, f"Second upsert failed: {r2.status_code}"
+    user2 = r2.json()
+    
+    # Should return same user
+    assert user1["privy_id"] == user2["privy_id"], "User privy_id changed"
+    assert user1.get("custodial_address") == user2.get("custodial_address"), "Custodial address changed"
+    print("✅ User upsert idempotent")
+    
+    # Test wallet balance endpoint
+    print("\nTesting GET /api/wallet/balance/{address}...")
+    test_address = "So11111111111111111111111111111111111111112"  # Wrapped SOL mint
+    r = httpx.get(f"{API_URL}/wallet/balance/{test_address}", timeout=30)
+    print(f"Status: {r.status_code}")
+    assert r.status_code == 200, f"Wallet balance failed: {r.status_code}"
+    
+    data = r.json()
+    print(f"Response: {data}")
+    assert "address" in data, "Missing address"
+    assert "sol" in data, "Missing sol"
+    assert "usdc" in data, "Missing usdc"
+    print("✅ Wallet balance working")
+    
+    print("\n✅ TEST 8 PASSED: All regression tests passed")
+    return True
+
+def run_all_tests():
+    """Run all tests and report results"""
+    print("=" * 80)
+    print("DEGENS.BET BACKEND TESTING - TRADING PAIRS SWAP")
+    print("=" * 80)
+    print(f"API URL: {API_URL}")
+    print(f"Expected pairs: {', '.join(EXPECTED_PAIRS)}")
+    print("=" * 80)
+    
+    tests = [
+        ("Pairs list & live data", test_1_pairs_list_and_live_data),
+        ("Single pair lookup", test_2_single_pair_lookup),
+        ("Trade flow on new pairs", test_3_trade_flow_on_new_pairs),
+        ("Old pair rejection", test_4_old_pair_rejection),
+        ("Token endpoint new tokenomics", test_5_token_endpoint_new_tokenomics),
+        ("Competition prizes intact", test_6_competitions_prizes_intact),
+        ("Deposit conversion works", test_7_deposit_conversion_works),
+        ("Regression tests", test_8_regression_tests),
+    ]
+    
+    results = []
+    for name, test_func in tests:
+        try:
+            test_func()
+            results.append((name, "PASSED", None))
+        except AssertionError as e:
+            results.append((name, "FAILED", str(e)))
+        except Exception as e:
+            results.append((name, "ERROR", str(e)))
+    
+    # Print summary
+    print("\n" + "=" * 80)
+    print("TEST SUMMARY")
+    print("=" * 80)
+    
+    passed = 0
+    failed = 0
+    errors = 0
+    
+    for name, status, error in results:
+        if status == "PASSED":
+            print(f"✅ {name}: {status}")
+            passed += 1
+        elif status == "FAILED":
+            print(f"❌ {name}: {status}")
+            print(f"   Error: {error}")
+            failed += 1
         else:
-            print_result("Exactly 1 manual withdrawal (1.4 SOL)", False, f"Record: {wd}")
-            tests_passed.append(False)
-    else:
-        print_result("Exactly 1 manual withdrawal (1.4 SOL)", False, f"Found {len(withdrawals)} records")
-        tests_passed.append(False)
+            print(f"⚠️  {name}: {status}")
+            print(f"   Error: {error}")
+            errors += 1
     
-    return all(tests_passed)
-
-def test_admin_reject_refund():
-    """Test admin reject refunds correctly"""
-    print_section("STEP 4: Admin Reject Refund")
+    print("=" * 80)
+    print(f"Total: {len(tests)} tests")
+    print(f"Passed: {passed}")
+    print(f"Failed: {failed}")
+    print(f"Errors: {errors}")
+    print("=" * 80)
     
-    headers = {"X-Privy-Id": TEST_PRIVY_ID}
-    # Admin user has x_handle=wd_test (matches ADMIN_X_HANDLES), privy_id=wd_test_1
-    admin_headers = {"X-Privy-Id": TEST_PRIVY_ID}
-    
-    # Get pending withdrawal
-    resp = requests.get(f"{BACKEND_URL}/wallet/withdrawals/me", headers=headers)
-    withdrawals = resp.json().get("withdrawals", [])
-    pending = [w for w in withdrawals if w.get("status") == "pending"]
-    
-    if not pending:
-        print_result("Find pending withdrawal", False, "No pending withdrawals found")
-        return False
-    
-    withdrawal_id = pending[0]["id"]
-    amount_usd = pending[0]["amount_usd"]
-    print(f"Found pending withdrawal: id={withdrawal_id}, amount_usd=${amount_usd:.2f}")
-    
-    # Get balance before reject
-    resp = requests.get(f"{BACKEND_URL}/users/me", headers=headers)
-    balance_before = resp.json().get("real", {}).get("balance", 0)
-    print(f"Balance before reject: ${balance_before:.2f}")
-    
-    # Admin reject
-    resp = requests.post(f"{BACKEND_URL}/admin/withdrawals/{withdrawal_id}/reject", headers=admin_headers)
-    
-    if resp.status_code != 200:
-        print_result("Admin reject request", False, f"Status {resp.status_code}: {resp.text}")
-        return False
-    
-    print(f"Admin reject response: {resp.json()}")
-    
-    # Check balance increased
-    resp = requests.get(f"{BACKEND_URL}/users/me", headers=headers)
-    balance_after = resp.json().get("real", {}).get("balance", 0)
-    print(f"Balance after reject: ${balance_after:.2f}")
-    
-    refund_amount = balance_after - balance_before
-    print(f"Refund amount: ${refund_amount:.2f}")
-    
-    if abs(refund_amount - amount_usd) < 0.01:
-        print_result("Balance refunded correctly", True, f"Refunded ${refund_amount:.2f}")
-        return True
-    else:
-        print_result("Balance refunded correctly", False, f"Expected ${amount_usd:.2f}, got ${refund_amount:.2f}")
-        return False
-
-def test_regression_market_prices():
-    """Regression test: GET /api/markets/prices returns 7 pairs"""
-    print_section("STEP 5: Regression - Market Prices")
-    
-    resp = requests.get(f"{BACKEND_URL}/markets/prices")
-    
-    if resp.status_code != 200:
-        print_result("Market prices endpoint", False, f"Status {resp.status_code}")
-        return False
-    
-    data = resp.json()
-    pairs = data.get("prices", [])
-    
-    if len(pairs) == 7:
-        print_result("Returns 7 pairs", True, f"Pairs: {[p['pair'] for p in pairs]}")
-        return True
-    else:
-        print_result("Returns 7 pairs", False, f"Found {len(pairs)} pairs")
-        return False
-
-def main():
-    print("\n" + "="*80)
-    print("  DEGENS.BET WITHDRAWAL FIX VERIFICATION TEST")
-    print("  Testing auto-to-manual fallback when TREASURY_PRIVKEY is empty")
-    print("="*80)
-    
-    results = {}
-    
-    # Step 1: Reset test user
-    results["reset"] = reset_test_user()
-    
-    # Step 2: Auto-eligible withdrawal
-    if results["reset"]:
-        results["auto_eligible"] = test_auto_eligible_withdrawal()
-    else:
-        results["auto_eligible"] = False
-        print("\n⚠️  Skipping auto-eligible test due to reset failure")
-    
-    # Step 3: Mixed withdrawal
-    results["mixed"] = test_mixed_withdrawal()
-    
-    # Step 4: Admin reject refund
-    results["admin_reject"] = test_admin_reject_refund()
-    
-    # Step 5: Regression
-    results["regression"] = test_regression_market_prices()
-    
-    # Summary
-    print_section("TEST SUMMARY")
-    print(f"{'Test':<40} {'Result':<10}")
-    print("-" * 50)
-    print(f"{'1. Reset test user':<40} {'✅ PASS' if results['reset'] else '❌ FAIL':<10}")
-    print(f"{'2. Auto-eligible withdrawal (0.5 SOL)':<40} {'✅ PASS' if results['auto_eligible'] else '❌ FAIL':<10}")
-    print(f"{'3. Mixed withdrawal (1.4 SOL)':<40} {'✅ PASS' if results['mixed'] else '❌ FAIL':<10}")
-    print(f"{'4. Admin reject refund':<40} {'✅ PASS' if results['admin_reject'] else '❌ FAIL':<10}")
-    print(f"{'5. Regression - Market prices':<40} {'✅ PASS' if results['regression'] else '❌ FAIL':<10}")
-    print("-" * 50)
-    
-    total = len(results)
-    passed = sum(1 for v in results.values() if v)
-    print(f"\nTotal: {passed}/{total} tests passed")
-    
-    if all(results.values()):
-        print("\n🎉 ALL TESTS PASSED! Withdrawal fix verified successfully.")
-        return 0
-    else:
-        print("\n❌ SOME TESTS FAILED. Review details above.")
-        return 1
+    return failed == 0 and errors == 0
 
 if __name__ == "__main__":
-    exit(main())
+    success = run_all_tests()
+    exit(0 if success else 1)

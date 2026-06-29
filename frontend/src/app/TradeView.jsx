@@ -1,16 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAppUser } from './UserSync';
 import { useAccount } from './AccountContext';
 import { usePrices } from './PricesProvider';
-import { api, PAIRS, fmtUsd, formatPrice } from '../lib/api';
+import { api, PAIRS, fmtBalance, formatPrice } from '../lib/api';
 import { ArrowUpRight, ArrowDownRight, Share2 } from 'lucide-react';
 import PnlShareModal from '../components/PnlShareModal';
 
 export default function TradeView() {
   const { dbUser, refresh } = useAppUser();
-  const { account } = useAccount();
+  const { account, displayCurrency, setDisplayCurrency } = useAccount();
   const { prices } = usePrices();
+  const solPrice = prices['SOL/USD']?.price || 150;
+  const fmt = (n, opts) => fmtBalance(n, displayCurrency, solPrice, opts);
   const [params, setParams] = useSearchParams();
   const [pair, setPair] = useState(params.get('pair') || 'ANSEM/USD');
   const [side, setSide] = useState('long');
@@ -40,21 +42,20 @@ export default function TradeView() {
     }
   }, [prices, pair, setParams]);
 
-  // seed chart with synthetic history derived from 24h change so it's not empty
+  // Fetch REAL historical candles from GeckoTerminal (via backend) on pair change.
+  // Append live tick prices on top so the chart keeps growing every poll.
   useEffect(() => {
-    if (!px) { setHistory([]); return; }
-    const nowMs = Date.now();
-    const change = (px.change_24h || 0) / 100;
-    const startPrice = px.price / (1 + change);
-    const seeded = Array.from({ length: 30 }, (_, i) => {
-      const t = nowMs - (29 - i) * 2 * 60 * 1000;
-      const progress = i / 29;
-      const noise = (Math.sin(i * 0.73) + Math.cos(i * 1.31)) * Math.abs(change) * 0.18 * px.price;
-      const p = startPrice + (px.price - startPrice) * progress + noise;
-      return { t, p: Math.max(p, 0.00000001) };
-    });
-    setHistory(seeded);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    let alive = true;
+    setHistory([]);
+    const fetchCandles = async () => {
+      try {
+        const r = await api.get(`/markets/candles/${encodeURIComponent(pair)}?limit=60`);
+        if (!alive) return;
+        const candles = (r.data?.candles || []).map(c => ({ t: c.t * 1000, p: c.c }));
+        setHistory(candles);
+      } catch (e) { /* noop */ }
+    };
+    fetchCandles();
   }, [pair]);
 
   useEffect(() => {
@@ -63,7 +64,7 @@ export default function TradeView() {
       const lastTime = h.length ? h[h.length-1].t : 0;
       const t = Date.parse(px.updated_at);
       if (t === lastTime) return h;
-      return [...h, { t, p: px.price }].slice(-60);
+      return [...h, { t, p: px.price }].slice(-180);
     });
   }, [px?.updated_at, pair]);
 
@@ -87,7 +88,7 @@ export default function TradeView() {
     try {
       await api.post('/positions/open', {
         pair, side,
-        margin: Number(margin),
+        margin: Number(marginAsUsd),
         leverage: Number(leverage),
         account_type: account,
       });
@@ -113,12 +114,51 @@ export default function TradeView() {
 
   const switchPair = (p) => { setPair(p); setParams({ pair: p }); };
 
+  // Live PnL for any open position — recomputed every tick using current mark price.
+  const livePnl = (p) => {
+    const cur = prices[p.pair];
+    if (!cur || !p.entry_price) return p.unrealized_pnl || 0;
+    const dir = p.side === 'long' ? 1 : -1;
+    const pct = ((cur.price - p.entry_price) / p.entry_price) * dir * p.leverage;
+    return p.margin * pct;
+  };
+  const liveMark = (p) => prices[p.pair]?.price || p.mark_price;
+
+  // Convert user-entered margin (in their chosen display currency) to USD for the request body.
+  const marginAsUsd = displayCurrency === 'SOL' ? (Number(margin) || 0) * solPrice : (Number(margin) || 0);
+  const sizeUsd = marginAsUsd * Number(leverage);
+  const liqPrice = px ? (side === 'long'
+    ? px.price * (1 - 1 / leverage)
+    : px.price * (1 + 1 / leverage)) : 0;
+  const quantity = px && px.price > 0 ? sizeUsd / px.price : 0;
+  const availDisplay = displayCurrency === 'SOL'
+    ? (acct.balance || 0) / solPrice
+    : (acct.balance || 0);
+  const marginUnit = displayCurrency === 'SOL' ? 'SOL' : 'USDC';
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="section-label">// TERMINAL.EXE</div>
-        <div className={`font-pixel text-[9px] px-3 py-2 border-2 ${account==='real' ? 'border-[#ff3838] text-[#ff3838]' : 'border-[#00FF29] text-[#00FF29]'}`}>
-          TRADING [{account.toUpperCase()}] · BAL {fmtUsd(acct.balance || 0)}
+        <div className="flex items-center gap-3">
+          <div className="flex border-2 border-[#1f1f1f] bg-[#0d0d0d]">
+            {['USD', 'SOL'].map(c => {
+              const active = displayCurrency === c;
+              return (
+                <button
+                  key={c}
+                  data-testid={`tv-currency-${c.toLowerCase()}`}
+                  onClick={() => setDisplayCurrency(c)}
+                  className={`px-3 py-1.5 font-pixel text-[8px] ${active ? 'bg-[#00FF29] text-[#050505]' : 'text-[#808080] hover:text-white'}`}
+                >
+                  {c}
+                </button>
+              );
+            })}
+          </div>
+          <div className={`font-pixel text-[9px] px-3 py-2 border-2 ${account==='real' ? 'border-[#ff3838] text-[#ff3838]' : 'border-[#00FF29] text-[#00FF29]'}`}>
+            TRADING [{account.toUpperCase()}] \u00b7 BAL {fmt(acct.balance || 0)}
+          </div>
         </div>
       </div>
 
@@ -172,13 +212,17 @@ export default function TradeView() {
             </button>
           </div>
 
-          <Label text="MARGIN (USDC)" />
+          <Label text={`MARGIN (${marginUnit})`} />
           <div className="flex gap-2 mb-3">
             <input type="number" value={margin} onChange={e => setMargin(e.target.value)}
+              step={displayCurrency === 'SOL' ? '0.01' : '1'}
               className="flex-1 bg-[#0d0d0d] border-2 border-[#1f1f1f] focus:border-[#00FF29] outline-none px-3 py-2 font-mono text-[16px] text-white" />
             <div className="flex gap-1">
               {[25, 50, 100].map(pct => (
-                <button key={pct} onClick={() => setMargin(Math.floor((acct.balance || 0) * pct / 100))}
+                <button key={pct} onClick={() => {
+                  const target = (availDisplay * pct) / 100;
+                  setMargin(displayCurrency === 'SOL' ? Number(target.toFixed(4)) : Math.floor(target));
+                }}
                   className="px-2 py-2 bg-[#0d0d0d] border border-[#1f1f1f] hover:border-[#00FF29] font-pixel text-[8px] text-[#808080]">{pct}%</button>
               ))}
             </div>
@@ -197,10 +241,11 @@ export default function TradeView() {
           </div>
 
           <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-3 mb-4 space-y-1">
-            <Row label="POSITION SIZE" value={fmtUsd(Number(margin) * Number(leverage))} />
+            <Row label="POSITION SIZE" value={fmt(sizeUsd)} />
+            <Row label="QUANTITY" value={`${quantity.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${pair.split('/')[0]}`} />
             <Row label="ENTRY (EST)" value={px ? `$${formatPrice(px.price)}` : '-'} />
-            <Row label="LIQ ESTIMATE" value={leverage > 1 ? `~${(100 / leverage).toFixed(2)}%` : '—'} />
-            <Row label={`${account.toUpperCase()} AVAIL`} value={fmtUsd(acct.balance || 0)} color={account==='real'?'#ff3838':'#00FF29'} />
+            <Row label="LIQ PRICE" value={px ? `$${formatPrice(liqPrice)} (${(100 / leverage).toFixed(2)}%)` : '\u2014'} color={'#ff3838'} />
+            <Row label={`${account.toUpperCase()} AVAIL`} value={fmt(acct.balance || 0)} color={account==='real'?'#ff3838':'#00FF29'} />
           </div>
 
           {err && <div className="font-pixel text-[9px] text-[#ff3838] mb-2">! {err.toUpperCase()}</div>}
@@ -230,28 +275,41 @@ export default function TradeView() {
                   <th className="text-right">SIZE</th>
                   <th className="text-right">ENTRY</th>
                   <th className="text-right">MARK</th>
+                  <th className="text-right">LIQ</th>
                   <th className="text-right">PNL</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {openPos.map(p => (
-                  <tr key={p.id} className="border-b border-[#1f1f1f]/50">
-                    <td className="py-3 text-white">{p.pair}</td>
-                    <td className={p.side === 'long' ? 'text-[#00FF29]' : 'text-[#ff3838]'}>{p.side.toUpperCase()} {p.leverage}x</td>
-                    <td className="text-right text-[#808080]">{fmtUsd(p.margin)}</td>
-                    <td className="text-right text-[#808080]">{fmtUsd(p.size)}</td>
-                    <td className="text-right text-[#808080]">{formatPrice(p.entry_price)}</td>
-                    <td className="text-right text-white">{formatPrice(p.mark_price)}</td>
-                    <td className={`text-right ${(p.unrealized_pnl||0) >= 0 ? 'text-[#00FF29]' : 'text-[#ff3838]'}`}>{fmtUsd(p.unrealized_pnl || 0, { sign: true })}</td>
-                    <td className="text-right">
-                      <button onClick={() => closeTrade(p.id)} disabled={busy}
-                        className="px-3 py-1 font-pixel text-[8px] bg-[#0d0d0d] border border-[#ff3838] text-[#ff3838] hover:bg-[#ff3838] hover:text-[#050505]">
-                        CLOSE
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {openPos.map(p => {
+                  const pnl = livePnl(p);
+                  const mark = liveMark(p);
+                  const liq = p.liq_price ?? (p.side === 'long'
+                    ? p.entry_price * (1 - 1 / p.leverage)
+                    : p.entry_price * (1 + 1 / p.leverage));
+                  const pnlPctLive = p.margin ? (pnl / p.margin) * 100 : 0;
+                  return (
+                    <tr key={p.id} className="border-b border-[#1f1f1f]/50">
+                      <td className="py-3 text-white">{p.pair}</td>
+                      <td className={p.side === 'long' ? 'text-[#00FF29]' : 'text-[#ff3838]'}>{p.side.toUpperCase()} {p.leverage}x</td>
+                      <td className="text-right text-[#808080]">{fmt(p.margin)}</td>
+                      <td className="text-right text-[#808080]">{fmt(p.size)}</td>
+                      <td className="text-right text-[#808080]">{formatPrice(p.entry_price)}</td>
+                      <td className="text-right text-white">{formatPrice(mark)}</td>
+                      <td className="text-right text-[#ff3838]/80">{formatPrice(liq)}</td>
+                      <td className={`text-right ${pnl >= 0 ? 'text-[#00FF29]' : 'text-[#ff3838]'}`}>
+                        {fmt(pnl, { sign: true })}
+                        <span className="font-pixel text-[7px] ml-1 opacity-70">({pnlPctLive >= 0 ? '+' : ''}{pnlPctLive.toFixed(0)}%)</span>
+                      </td>
+                      <td className="text-right">
+                        <button onClick={() => closeTrade(p.id)} disabled={busy}
+                          className="px-3 py-1 font-pixel text-[8px] bg-[#0d0d0d] border border-[#ff3838] text-[#ff3838] hover:bg-[#ff3838] hover:text-[#050505]">
+                          CLOSE
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -283,7 +341,7 @@ export default function TradeView() {
                       <td className={p.side === 'long' ? 'text-[#00FF29]' : 'text-[#ff3838]'}>{p.side.toUpperCase()} {p.leverage}x</td>
                       <td className="text-right text-[#808080]">{formatPrice(p.entry_price)} \u2192 {formatPrice(p.exit_price)}</td>
                       <td className={`text-right ${(p.pnl || 0) >= 0 ? 'text-[#00FF29]' : 'text-[#ff3838]'}`}>
-                        {fmtUsd(p.pnl || 0, { sign: true })}
+                        {fmt(p.pnl || 0, { sign: true })}
                         <span className="font-pixel text-[7px] ml-1 opacity-70">
                           ({pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(0)}%)
                         </span>

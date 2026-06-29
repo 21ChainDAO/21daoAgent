@@ -75,7 +75,7 @@ export default function PnlShareModal({ open, onClose, position, handle, shareUr
         padding: 24, overflow: 'auto',
       }}
     >
-      <div style={{ position: 'relative', maxWidth: 1080, width: '100%' }}>
+      <div style={{ position: 'relative', maxWidth: 600, width: '100%' }}>
         {/* Close */}
         <button
           data-testid="pnl-modal-close"
@@ -95,16 +95,16 @@ export default function PnlShareModal({ open, onClose, position, handle, shareUr
           // POSITION CLOSED · SHARE YOUR PNL
         </div>
 
-        {/* Card preview (scaled-down responsive) */}
+        {/* Card preview — capped at 540px for a compact share preview */}
         <div ref={cardRef} style={{
-          width: '100%', aspectRatio: '1 / 1', position: 'relative',
-          border: '2px solid #1f1f1f', overflow: 'hidden',
+          width: '100%', maxWidth: 540, margin: '0 auto', aspectRatio: '1 / 1', position: 'relative',
+          border: '2px solid #1f1f1f', overflow: 'hidden', background: '#050505',
         }}>
           <div style={{
-            transform: 'scale(var(--pnl-scale, 0.55))',
+            transform: 'scale(0.5)',
             transformOrigin: 'top left',
             position: 'absolute', top: 0, left: 0,
-            // dynamic scaling via CSS
+            width: 1080, height: 1080,
           }}>
             <PnlCard
               pair={position.pair}
@@ -153,14 +153,11 @@ export default function PnlShareModal({ open, onClose, position, handle, shareUr
       </div>
 
       <style>{`
-        @media (min-width: 1140px) {
-          [data-testid="pnl-share-modal"] > div > div[ref] { /* not used */ }
+        @media (max-width: 700px) {
+          [data-testid="pnl-share-modal"] [data-testid="pnl-card-preview"] > div {
+            transform: scale(0.36) !important;
+          }
         }
-        :root { --pnl-scale: 1; }
-        @media (max-width: 1180px) { :root { --pnl-scale: 0.65; } }
-        @media (max-width: 900px)  { :root { --pnl-scale: 0.5; } }
-        @media (max-width: 700px)  { :root { --pnl-scale: 0.36; } }
-        @media (max-width: 500px)  { :root { --pnl-scale: 0.28; } }
       `}</style>
     </div>
   );

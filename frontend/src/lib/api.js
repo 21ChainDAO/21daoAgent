@@ -35,3 +35,21 @@ export function fmtUsd(n, opts = {}) {
   if (sign && n > 0) return '+' + s;
   return s;
 }
+
+// SOL formatter ─ shows X.XXXX SOL with optional sign
+export function fmtSol(usd, solPrice, opts = {}) {
+  const { sign = false } = opts;
+  if (usd == null || isNaN(usd) || !solPrice) return '0.0000 SOL';
+  const sol = usd / solPrice;
+  const abs = Math.abs(sol);
+  const s = abs.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) + ' SOL';
+  if (sol < 0) return '-' + s;
+  if (sign && sol > 0) return '+' + s;
+  return s;
+}
+
+// Currency-aware balance formatter
+export function fmtBalance(usd, currency, solPrice, opts = {}) {
+  if (currency === 'SOL') return fmtSol(usd, solPrice, opts);
+  return fmtUsd(usd, opts);
+}

@@ -50,18 +50,24 @@ ANSEM, JUPITER, CARDS, KINS, TRIPLET, JOTCHUA, WORLD, DROOL — all `/USD` quote
 - Retro landing page + portal scaffold
 - Privy X OAuth + custodial wallet provisioning
 - Helius RPC integration + auto-sweep daemon
-- DexScreener price polling (8 Solana pairs, 5s interval)
-- Dual-account trading (Paper vs Real, simulated PnL)
+- DexScreener price polling (8 Solana pairs)
+- Dual-account trading (Paper vs Real)
 - Deposit / auto+manual withdrawal flow
 - Admin dashboard for manual withdrawal approval
 - **(Feb 2026)** 50% bonus + 35x rollover feature (server + UI)
 - **(Feb 2026)** Net-SOL crediting fix (no more 0.001 SOL deposit math drift)
-- **(Feb 2026)** Synthetic-seed chart history (no more stuck "COLLECTING TICKS")
-- **(Feb 2026)** Favicon swapped (user-supplied .ico), index.html now references `/favicon.ico?v=2` only
-- **(Feb 2026)** Asian pixel degen mascot removed from landing hero (ambient ASCII decor retained)
-- **(Feb 2026)** PnL Share Card: 1080×1080 pixel-art receipt with logo, pair/side/leverage, big % + $ PnL, entry/liq prices, money-bag (win) or coffin (loss) art, QR to /app, X handle. Auto-opens after each close. Manual `SHARE` buttons on recently-closed history. Download PNG / Post to X / Copy caption.
-- **(Feb 2026)** Leaderboard reworked: 4 tabs — Global Paper, Global Real, Paper Arcade (comp), Real Arena (comp). Competition tabs show opt-in entries sorted by `comp_pnl` with fee-paid column.
-- **(Feb 2026)** Competition entry fees lowered: Paper 1 → **0.25 SOL**, Real 10 → **2.5 SOL** (auto-applied via `ensure_default_competitions` upsert on backend start).
+- **(Feb 2026)** Favicon swapped, mascot removed from landing
+- **(Feb 2026)** PnL Share Card (1080×1080 receipt, money-bag/coffin art, QR, X handle) — compact 540×540 preview, download/tweet/copy actions
+- **(Feb 2026)** Leaderboard reworked → 4 tabs (Global Paper / Global Real / Paper Arcade / Real Arena)
+- **(Feb 2026)** Competition entry fees lowered: Paper 0.25 SOL, Real 2.5 SOL
+- **(Feb 2026)** Dashboard balance hero — two big balance panels (Paper + Real) with live equity & deposit hint
+- **(Feb 2026)** USD/SOL currency toggle on Dashboard + TradeView (Margin input, Position size, PnL, Balance) using live SOL/USD price
+- **(Feb 2026)** Real OHLCV chart data via GeckoTerminal public API + 30s server cache (`/api/markets/candles/{pair}`). Frontend fetches real candles on pair switch, appends live ticks.
+- **(Feb 2026)** Auto-liquidation engine — `liquidation_loop()` scans open positions every 2s, force-closes any whose unrealized PnL ≤ -100% margin. Stored as `status=liquidated`, `liquidated=true`.
+- **(Feb 2026)** Position metadata extended: server now stores `quantity` (tokens) and `liq_price` at open. TradeView shows live PnL %, LIQ column.
+- **(Feb 2026)** Master/treasury wallet rotated → pubkey `5udQREPCo9TqESvwwhxBi7ReBjcTfJxVQvUDPec6diWW`.
+- **(Feb 2026)** Manual withdrawal cancel: new endpoint `POST /api/wallet/withdraw/cancel/{wid}` refunds USD on cancel. WalletPage shows CANCEL button on pending manual rows.
+- **(Feb 2026)** Explicit withdrawal policy callout on WalletPage: green INSTANT card (initial deposit amount) + yellow MANUAL REVIEW card (profits). Bonus-active warning banner.
 
 ### 🔄 In Progress — Awaiting User Manual Verification
 - P0 bug fixes (deposit math, chart, favicon, Privy login with new Twitter API keys)

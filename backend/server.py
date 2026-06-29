@@ -68,6 +68,7 @@ PAIRS = {f"{p['sym']}/USD": {"mint": p["mint"], "sym": p["sym"]} for p in PAIRS_
 _PRICE_CACHE: Dict[str, Dict] = {}
 _PRICE_TASK: Optional[asyncio.Task] = None
 _SWEEP_TASK: Optional[asyncio.Task] = None
+_LIQUIDATION_TASK: Optional[asyncio.Task] = None
 
 def now() -> datetime:
     return datetime.now(timezone.utc)
@@ -391,12 +392,59 @@ async def sweep_loop():
             log.warning("sweep loop err: %s", e)
         await asyncio.sleep(SWEEP_INTERVAL_SECONDS)
 
+# ---------------- Auto-liquidation ----------------
+# Maintenance margin: if unrealized PnL drops to -100% of margin (or worse) → liquidate.
+LIQUIDATION_INTERVAL_SECONDS = 2
+
+async def liquidation_loop():
+    """Scans open positions every few seconds. If mark price would wipe the margin,
+    auto-close the position as 'liquidated' with pnl = -margin."""
+    await asyncio.sleep(8)
+    while True:
+        try:
+            opens = await db.positions.find(
+                {"status": "open"},
+                {"_id": 0},
+            ).to_list(2000)
+            for pos in opens:
+                mark = _PRICE_CACHE.get(pos["pair"])
+                if not mark:
+                    continue
+                exit_price = mark["price"]
+                pnl_pct = _pnl_pct(pos["side"], pos["entry_price"], exit_price) * pos["leverage"]
+                pnl = pos["margin"] * pnl_pct
+                if pnl <= -pos["margin"]:
+                    # liquidate
+                    pnl = -pos["margin"]
+                    acct = pos.get("account_type", "paper")
+                    await db.positions.update_one(
+                        {"id": pos["id"], "status": "open"},
+                        {"$set": {
+                            "status": "liquidated",
+                            "exit_price": exit_price,
+                            "pnl": pnl,
+                            "closed_at": now(),
+                            "liquidated": True,
+                        }},
+                    )
+                    # margin already deducted on open; payout=0 (loss = -margin), so just record stats
+                    await db.users.update_one(
+                        {"privy_id": pos["privy_id"]},
+                        {"$inc": {f"{acct}.total_pnl": pnl}},
+                    )
+                    log.info("LIQUIDATED %s @ %s side=%s lev=%sx margin=%s",
+                             pos["pair"], exit_price, pos["side"], pos["leverage"], pos["margin"])
+        except Exception as e:
+            log.warning("liquidation loop err: %s", e)
+        await asyncio.sleep(LIQUIDATION_INTERVAL_SECONDS)
+
 # ---------------- App startup ----------------
 @app.on_event("startup")
 async def on_start():
-    global _PRICE_TASK, _SWEEP_TASK
+    global _PRICE_TASK, _SWEEP_TASK, _LIQUIDATION_TASK
     _PRICE_TASK = asyncio.create_task(price_loop())
     _SWEEP_TASK = asyncio.create_task(sweep_loop())
+    _LIQUIDATION_TASK = asyncio.create_task(liquidation_loop())
     # seed competitions if not present
     await ensure_default_competitions()
 
@@ -406,6 +454,8 @@ async def on_stop():
         _PRICE_TASK.cancel()
     if _SWEEP_TASK:
         _SWEEP_TASK.cancel()
+    if _LIQUIDATION_TASK:
+        _LIQUIDATION_TASK.cancel()
     client.close()
 
 # ---------------- Helpers ----------------
@@ -487,9 +537,14 @@ async def me(x_privy_id: str = Header(...)):
 
 # ---------------- Routes: markets ----------------
 @api.get("/markets/prices")
+@api.get("/markets/prices")
 async def market_prices():
-    # Only return tradeable pairs (exclude SOL/USD which is internal)
-    return {"prices": [p for k, p in _PRICE_CACHE.items() if k in PAIRS]}
+    """Return all tradeable pair prices + SOL/USD reference price (used for currency toggle)."""
+    out = [p for k, p in _PRICE_CACHE.items() if k in PAIRS]
+    sol = _PRICE_CACHE.get("SOL/USD")
+    if sol:
+        out.append(sol)
+    return {"prices": out}
 
 @api.get("/markets/price/{pair_path:path}")
 async def market_price(pair_path: str):
@@ -497,6 +552,58 @@ async def market_price(pair_path: str):
     if not p:
         raise HTTPException(404, "unknown pair")
     return p
+
+# In-memory candle cache so we don't hammer GeckoTerminal (30 req/min free tier).
+# Refreshes per pair only every 30s.
+_CANDLE_CACHE: Dict[str, Dict] = {}
+
+@api.get("/markets/candles/{pair_path:path}")
+async def market_candles(pair_path: str, timeframe: str = "minute", limit: int = 60):
+    """Real OHLCV candles from GeckoTerminal for the chart. Free public API.
+    Caches per (pair, timeframe) for 30s to stay under rate limits."""
+    key = pair_path.upper()
+    cached = _CANDLE_CACHE.get(f"{key}:{timeframe}")
+    nowts = datetime.now(timezone.utc).timestamp()
+    if cached and (nowts - cached["fetched_at"] < 30):
+        return {"pair": key, "timeframe": timeframe, "candles": cached["candles"][-limit:]}
+
+    p = _PRICE_CACHE.get(key)
+    if not p:
+        raise HTTPException(404, "unknown pair")
+    pool_address = p.get("pair_address")
+    if not pool_address:
+        # fall back to flat candles built from last price
+        last = float(p.get("price") or 0)
+        synth = [{"t": int(nowts) - (60 - i) * 60, "o": last, "h": last, "l": last, "c": last, "v": 0}
+                 for i in range(limit)]
+        return {"pair": key, "timeframe": timeframe, "candles": synth, "source": "fallback"}
+
+    tf = timeframe if timeframe in ("minute", "hour", "day") else "minute"
+    try:
+        async with httpx.AsyncClient(timeout=10) as cx:
+            url = f"https://api.geckoterminal.com/api/v2/networks/solana/pools/{pool_address}/ohlcv/{tf}?aggregate=1&limit={min(limit,300)}"
+            r = await cx.get(url, headers={"Accept": "application/json;version=20230302"})
+            if r.status_code != 200:
+                raise HTTPException(502, f"geckoterminal {r.status_code}")
+            data = r.json() or {}
+            rows = (((data.get("data") or {}).get("attributes") or {}).get("ohlcv_list") or [])
+            # GeckoTerminal returns newest-first: [timestamp, o, h, l, c, v]
+            candles = [
+                {"t": int(row[0]), "o": float(row[1]), "h": float(row[2]),
+                 "l": float(row[3]), "c": float(row[4]), "v": float(row[5])}
+                for row in rows
+            ]
+            candles.sort(key=lambda x: x["t"])
+            _CANDLE_CACHE[f"{key}:{timeframe}"] = {"candles": candles, "fetched_at": nowts}
+            return {"pair": key, "timeframe": timeframe, "candles": candles[-limit:], "source": "geckoterminal"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.warning("candles fetch %s: %s", key, e)
+        last = float(p.get("price") or 0)
+        synth = [{"t": int(nowts) - (60 - i) * 60, "o": last, "h": last, "l": last, "c": last, "v": 0}
+                 for i in range(limit)]
+        return {"pair": key, "timeframe": timeframe, "candles": synth, "source": "fallback"}
 
 # ---------------- Routes: positions ----------------
 def _pnl_pct(side: str, entry: float, mark: float) -> float:
@@ -542,6 +649,9 @@ async def open_position(req: OpenPositionReq, x_privy_id: str = Header(...)):
         "leverage": req.leverage,
         "size": req.margin * req.leverage,
         "entry_price": price["price"],
+        "quantity": (req.margin * req.leverage) / price["price"] if price["price"] > 0 else 0,
+        "liq_price": (price["price"] * (1 - 1 / req.leverage)) if req.side == "long"
+                     else (price["price"] * (1 + 1 / req.leverage)),
         "status": "open",
         "exit_price": None,
         "pnl": 0.0,
@@ -949,6 +1059,31 @@ async def my_withdrawals(x_privy_id: str = Header(...)):
     u = await get_user_or_404(x_privy_id)
     docs = await db.withdrawals.find({"user_id": u["id"]}, {"_id": 0}).sort("requested_at", -1).to_list(50)
     return {"withdrawals": docs}
+
+@api.post("/wallet/withdraw/cancel/{wid}")
+async def cancel_withdrawal(wid: str, x_privy_id: str = Header(...)):
+    """User-initiated cancel for their own pending manual withdrawal.
+    Refunds the dollar amount back to their REAL balance."""
+    u = await get_user_or_404(x_privy_id)
+    wd = await db.withdrawals.find_one({"id": wid, "user_id": u["id"]})
+    if not wd:
+        raise HTTPException(404, "withdrawal not found")
+    if wd.get("status") != "pending":
+        raise HTTPException(400, f"cannot cancel: status={wd.get('status')}")
+    if wd.get("kind") != "manual":
+        raise HTTPException(400, "only manual withdrawals can be cancelled by user")
+    await db.withdrawals.update_one(
+        {"id": wid},
+        {"$set": {"status": "cancelled", "processed_at": now(), "cancelled_by": "user"}},
+    )
+    # Refund the reserved USD back to balance
+    refund_usd = float(wd.get("amount_usd") or 0)
+    if refund_usd > 0:
+        await db.users.update_one(
+            {"privy_id": x_privy_id},
+            {"$inc": {"real.balance": refund_usd}},
+        )
+    return {"cancelled": True, "refunded_usd": refund_usd}
 
 # ---------------- Routes: token ----------------
 @api.get("/token")

@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useAppUser } from './UserSync';
 import { useAccount } from './AccountContext';
-import { api, fmtUsd, formatPrice } from '../lib/api';
+import { api, fmtUsd, fmtBalance, formatPrice } from '../lib/api';
 import { usePrices } from './PricesProvider';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, ArrowDownRight, Swords, Wallet, TrendingUp, TrendingDown } from 'lucide-react';
 
 export default function Dashboard() {
   const { dbUser } = useAppUser();
-  const { account, setAccount } = useAccount();
+  const { account, setAccount, displayCurrency, setDisplayCurrency } = useAccount();
   const { prices } = usePrices();
+  const solPrice = prices['SOL/USD']?.price || 150;
+  const fmt = (n, opts) => fmtBalance(n, displayCurrency, solPrice, opts);
   const [openPos, setOpenPos] = useState([]);
   const [history, setHistory] = useState([]);
   const [otherOpenPos, setOtherOpenPos] = useState([]);
@@ -65,6 +67,29 @@ export default function Dashboard() {
         </Link>
       </div>
 
+      {/* Currency toggle */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="font-pixel text-[8px] text-[#808080]">// DISPLAY</span>
+        <div className="flex border-2 border-[#1f1f1f] bg-[#0d0d0d]">
+          {['USD', 'SOL'].map(c => {
+            const active = displayCurrency === c;
+            return (
+              <button
+                key={c}
+                data-testid={`currency-toggle-${c.toLowerCase()}`}
+                onClick={() => setDisplayCurrency(c)}
+                className={`px-4 py-1.5 font-pixel text-[9px] ${active ? 'bg-[#00FF29] text-[#050505]' : 'text-[#808080] hover:text-white'}`}
+              >
+                {c}
+              </button>
+            );
+          })}
+        </div>
+        <span className="font-pixel text-[8px] text-[#808080]">
+          SOL = <span className="text-[#F5F5F5]">${solPrice.toFixed(2)}</span>
+        </span>
+      </div>
+
       {/* ─── BALANCE HERO ─── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <BalancePanel
@@ -80,6 +105,7 @@ export default function Dashboard() {
           equity={paperEq}
           subline="Practice with virtual funds"
           cta={null}
+          fmt={fmt}
         />
         <BalancePanel
           testId="balance-panel-real"
@@ -98,6 +124,7 @@ export default function Dashboard() {
           cta={realBal < 1 && !hasDeposited
             ? { to: '/app/wallet', text: 'DEPOSIT SOL \u2192' }
             : { to: '/app/wallet', text: 'WALLET \u2192' }}
+          fmt={fmt}
         />
       </div>
 
@@ -121,9 +148,9 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label={`${account.toUpperCase()} BALANCE`} value={fmtUsd(acct.balance || 0)} color="#F5F5F5" />
-        <StatCard label="UNREALIZED PNL" value={fmtUsd(unreal, { sign: true })} color={unreal >= 0 ? '#00FF29' : '#ff3838'} />
-        <StatCard label="REALIZED PNL" value={fmtUsd(acct.total_pnl || 0, { sign: true })} color={(acct.total_pnl || 0) >= 0 ? '#00FF29' : '#ff3838'} />
+        <StatCard label={`${account.toUpperCase()} BALANCE`} value={fmt(acct.balance || 0)} color="#F5F5F5" />
+        <StatCard label="UNREALIZED PNL" value={fmt(unreal, { sign: true })} color={unreal >= 0 ? '#00FF29' : '#ff3838'} />
+        <StatCard label="REALIZED PNL" value={fmt(acct.total_pnl || 0, { sign: true })} color={(acct.total_pnl || 0) >= 0 ? '#00FF29' : '#ff3838'} />
         <StatCard label="WIN RATE" value={`${winRate}%`} sub={`${acct.wins || 0}/${acct.trades_count || 0}`} color="#F5F5F5" />
       </div>
 
@@ -156,10 +183,10 @@ export default function Dashboard() {
                     <tr key={p.id} className="border-b border-[#1f1f1f]/50">
                       <td className="py-3 text-white">{p.pair}</td>
                       <td className={p.side === 'long' ? 'text-[#00FF29]' : 'text-[#ff3838]'}>{p.side.toUpperCase()} {p.leverage}x</td>
-                      <td className="text-right text-[#808080]">{fmtUsd(p.size)}</td>
+                      <td className="text-right text-[#808080]">{fmt(p.size)}</td>
                       <td className="text-right text-[#808080]">{formatPrice(p.entry_price)}</td>
                       <td className="text-right text-white">{formatPrice(p.mark_price)}</td>
-                      <td className={`text-right ${(p.unrealized_pnl || 0) >= 0 ? 'text-[#00FF29]' : 'text-[#ff3838]'}`}>{fmtUsd(p.unrealized_pnl || 0, { sign: true })}</td>
+                      <td className={`text-right ${(p.unrealized_pnl || 0) >= 0 ? 'text-[#00FF29]' : 'text-[#ff3838]'}`}>{fmt(p.unrealized_pnl || 0, { sign: true })}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -171,7 +198,7 @@ export default function Dashboard() {
         <div className="pixel-card p-5">
           <div className="font-pixel text-[10px] text-[#00FF29] mb-4">// MARKETS</div>
           <div className="space-y-2">
-            {Object.values(prices).map(p => (
+            {Object.values(prices).filter(p => p.pair !== 'SOL/USD').map(p => (
               <Link key={p.pair} to={`/app/trade?pair=${encodeURIComponent(p.pair)}`}
                 className="flex items-center justify-between py-2 px-2 hover:bg-[#0d0d0d] border border-transparent hover:border-[#1f1f1f]">
                 <div>
@@ -211,7 +238,7 @@ export default function Dashboard() {
                   <td className={p.side === 'long' ? 'text-[#00FF29]' : 'text-[#ff3838]'}>{p.side.toUpperCase()} {p.leverage}x</td>
                   <td className="text-right text-[#808080]">{formatPrice(p.entry_price)}</td>
                   <td className="text-right text-[#808080]">{formatPrice(p.exit_price)}</td>
-                  <td className={`text-right ${p.pnl >= 0 ? 'text-[#00FF29]' : 'text-[#ff3838]'}`}>{fmtUsd(p.pnl, { sign: true })}</td>
+                  <td className={`text-right ${p.pnl >= 0 ? 'text-[#00FF29]' : 'text-[#ff3838]'}`}>{fmt(p.pnl, { sign: true })}</td>
                   <td className="text-right">
                     <span className={`font-pixel text-[7px] px-2 py-1 ${p.status === 'liquidated' ? 'bg-[#ff3838] text-[#050505]' : 'bg-[#0d0d0d] text-[#00FF29] border border-[#1f1f1f]'}`}>
                       {p.status.toUpperCase()}
@@ -238,7 +265,7 @@ function StatCard({ label, value, sub, color }) {
 }
 
 function BalancePanel({
-  testId, label, balance, unreal, equity, accent, shadow, active, onClick, subline, cta,
+  testId, label, balance, unreal, equity, accent, shadow, active, onClick, subline, cta, fmt,
 }) {
   const unrealUp = unreal >= 0;
   return (
@@ -266,19 +293,19 @@ function BalancePanel({
         </span>
       </div>
 
-      <div className="font-pixel text-[34px] sm:text-[42px] text-white leading-none mb-2"
+      <div className="font-pixel text-[28px] sm:text-[34px] text-white leading-none mb-2"
            style={{ textShadow: active ? `0 0 14px ${accent}55` : 'none' }}>
-        {fmtUsd(balance)}
+        {fmt(balance)}
       </div>
 
       <div className="flex items-center gap-3 flex-wrap mb-3">
         <span className={`font-pixel text-[9px] flex items-center gap-1 ${unrealUp ? 'text-[#00FF29]' : 'text-[#ff3838]'}`}>
           {unrealUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-          {fmtUsd(unreal, { sign: true })}
+          {fmt(unreal, { sign: true })}
           <span className="text-[#808080] ml-1">unreal</span>
         </span>
         <span className="font-pixel text-[9px] text-[#808080]">
-          EQUITY <span className="text-white">{fmtUsd(equity)}</span>
+          EQUITY <span className="text-white">{fmt(equity)}</span>
         </span>
       </div>
 

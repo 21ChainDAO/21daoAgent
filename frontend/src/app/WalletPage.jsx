@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAppUser } from './UserSync';
-import { Copy, Check, AlertTriangle, RefreshCw, ExternalLink, ArrowDownToLine, ArrowUpFromLine, Gift } from 'lucide-react';
+import { Copy, Check, AlertTriangle, RefreshCw, ExternalLink, ArrowDownToLine, ArrowUpFromLine, Gift, X, Info, ShieldCheck, Clock } from 'lucide-react';
 import { api, fmtUsd } from '../lib/api';
 
 export default function WalletPage() {
@@ -26,7 +26,7 @@ export default function WalletPage() {
     try {
       const r = await api.get(`/wallet/balance/${addr}`);
       setOnchain({ sol: r.data.sol || 0, usdc: r.data.usdc || 0 });
-    } catch (e) {}
+    } catch (e) { /* noop */ }
     finally { setLoadingBal(false); }
   }, [addr]);
 
@@ -34,14 +34,14 @@ export default function WalletPage() {
     try {
       const r = await api.get('/wallet/withdrawals/me');
       setWithdrawals(r.data.withdrawals || []);
-    } catch (e) {}
+    } catch (e) { /* noop */ }
   };
 
   const loadBonus = async () => {
     try {
       const r = await api.get('/wallet/bonus_status');
       setBonus(r.data);
-    } catch (e) {}
+    } catch (e) { /* noop */ }
   };
 
   useEffect(() => {
@@ -105,6 +105,17 @@ export default function WalletPage() {
     }
   };
 
+  const cancelWithdrawal = async (wid) => {
+    try {
+      const r = await api.post(`/wallet/withdraw/cancel/${wid}`, {});
+      setWdMsg(`\u2713 CANCELLED \u00b7 ${fmtUsd(r.data?.refunded_usd || 0)} REFUNDED`);
+      await refresh(); await loadWithdrawals();
+    } catch (e) {
+      setWdMsg(e.response?.data?.detail || 'CANCEL FAILED');
+    }
+    setTimeout(() => setWdMsg(''), 6000);
+  };
+
   // Preview math
   const requestedSol = Number(wdAmount) || 0;
   const depositedSol = Number(dbUser?.total_sol_deposited || 0);
@@ -142,9 +153,11 @@ export default function WalletPage() {
                 +50% FIRST DEPOSIT BONUS
               </div>
               <p className="font-mono text-[16px] text-[#808080] mt-2">
-                Opt in <strong className="text-white">before</strong> your first deposit and we&apos;ll match 50% of it as bonus paper-trading credit on your REAL account.
-                Catch: you must trade <strong className="text-white">35\u00d7 the total credited amount</strong> in REAL volume before you can withdraw.
-                Skip the bonus and you can withdraw your deposited amount immediately (profits still need 1\u20133h review).
+                Toggle this <strong className="text-white">before your first deposit</strong> and we&apos;ll credit a <strong className="text-white">+50% bonus</strong> on top of your deposit amount.
+                <br/><br/>
+                <strong className="text-[#ffe93d]">Catch:</strong> while the bonus is active, <strong className="text-white">ALL withdrawals are locked</strong> (including your original deposit) until you trade <strong className="text-white">35\u00d7 the total credited amount</strong> in REAL-account volume.
+                <br/><br/>
+                <strong className="text-[#00FF29]">Skip the bonus</strong> = your deposit amount is withdrawable <strong className="text-white">instantly</strong>. Profits above that still need 1\u20133h review.
               </p>
               <button onClick={toggleBonus} disabled={bonusBusy}
                 className={`mt-4 pixel-btn !text-[9px] !py-2 ${bonus?.opted_in ? 'pixel-btn-primary' : 'pixel-btn-secondary'}`}>
@@ -231,6 +244,37 @@ export default function WalletPage() {
           Withdraw up to your deposit allowance instantly. Profits above that require a 1-3h review.
         </div>
 
+        {/* WITHDRAWAL POLICY */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          <div className="bg-[#0d0d0d] border-l-4 border-l-[#00FF29] border border-[#1f1f1f] p-3 flex items-start gap-3">
+            <ShieldCheck size={16} className="text-[#00FF29] mt-1 shrink-0" />
+            <div>
+              <div className="font-pixel text-[8px] text-[#00FF29] mb-1">INSTANT \u00b7 DEPOSIT AMOUNT</div>
+              <div className="font-mono text-[13px] text-[#808080]">
+                Up to <strong className="text-white">{allowance.toFixed(4)} SOL</strong>
+                {' '}(your remaining initial deposit) is sent <strong className="text-white">automatically</strong> from treasury.
+              </div>
+            </div>
+          </div>
+          <div className="bg-[#0d0d0d] border-l-4 border-l-[#ffe93d] border border-[#1f1f1f] p-3 flex items-start gap-3">
+            <Clock size={16} className="text-[#ffe93d] mt-1 shrink-0" />
+            <div>
+              <div className="font-pixel text-[8px] text-[#ffe93d] mb-1">MANUAL REVIEW \u00b7 PROFITS</div>
+              <div className="font-mono text-[13px] text-[#808080]">
+                Anything <strong className="text-white">above your deposit</strong> (profits) requires manual review (<strong className="text-white">1-3h</strong>). You can cancel it any time below.
+              </div>
+            </div>
+          </div>
+        </div>
+        {bonus?.active && (
+          <div className="bg-[#0d0d0d] border border-[#ffe93d] p-3 mb-4 flex items-start gap-3">
+            <Info size={14} className="text-[#ffe93d] mt-1 shrink-0" />
+            <div className="font-mono text-[13px] text-[#808080]">
+              <strong className="text-[#ffe93d]">Bonus active:</strong> all withdrawals (including your deposit) are locked until 35x rollover is met.
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mb-3">
           <div className="md:col-span-8">
             <div className="font-pixel text-[8px] text-[#808080] mb-2">DESTINATION SOLANA ADDRESS</div>
@@ -292,7 +336,7 @@ export default function WalletPage() {
                 <th className="text-right">AMOUNT</th>
                 <th className="text-center">KIND</th>
                 <th className="text-right">STATUS</th>
-                <th className="text-right">TX</th>
+                <th className="text-right">TX / ACTION</th>
               </tr>
             </thead>
             <tbody>
@@ -311,6 +355,7 @@ export default function WalletPage() {
                       w.status === 'completed' ? 'bg-[#00FF29] text-[#050505]' :
                       w.status === 'pending' ? 'bg-[#0d0d0d] text-[#ffe93d] border border-[#ffe93d]' :
                       w.status === 'rejected' ? 'bg-[#ff3838] text-[#050505]' :
+                      w.status === 'cancelled' ? 'bg-[#0d0d0d] text-[#808080] border border-[#808080]' :
                       'bg-[#0d0d0d] text-[#ff3838] border border-[#ff3838]'
                     }`}>{w.status.toUpperCase()}</span>
                   </td>
@@ -320,6 +365,14 @@ export default function WalletPage() {
                         className="text-[#00FF29] hover:underline font-mono text-[12px]">
                         {w.tx_signature.slice(0,6)}...
                       </a>
+                    ) : (w.status === 'pending' && w.kind === 'manual') ? (
+                      <button
+                        data-testid={`cancel-withdrawal-${w.id}`}
+                        onClick={() => cancelWithdrawal(w.id)}
+                        className="font-pixel text-[7px] px-2 py-1 border border-[#ff3838] text-[#ff3838] hover:bg-[#ff3838] hover:text-[#050505] inline-flex items-center gap-1"
+                      >
+                        <X size={10} /> CANCEL
+                      </button>
                     ) : '\u2014'}
                   </td>
                 </tr>

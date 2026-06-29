@@ -39,9 +39,9 @@ export default function TokenSection() {
     <section id="token" className="relative z-10 py-28">
       <div className="max-w-[1400px] mx-auto px-6">
         <div className="text-center mb-12">
-          <div className="section-label mb-4 inline-flex">// $DBET.TOKEN</div>
+          <div className="section-label mb-4 inline-flex">// $DEGEN.TOKEN</div>
           <h2 className="font-pixel text-white text-[24px] md:text-[40px] leading-tight">
-            POWERED BY <span className="glow-green">$dBET</span>
+            POWERED BY <span className="glow-green">$DEGEN</span>
           </h2>
           <p className="font-mono text-[20px] text-[#808080] mt-4 max-w-2xl mx-auto">
             One billion tokens. Fair launch. Built to reward the degens who built the arcade with us.
@@ -78,7 +78,7 @@ export default function TokenSection() {
                 </div>
                 <div className="font-pixel text-[22px]" style={{ color: t.color }}>{t.pct}%</div>
                 <div className="font-pixel text-[9px] text-white mt-2">{t.label}</div>
-                <div className="font-mono text-[14px] text-[#808080] mt-2">{formatN(t.amount)} dBET</div>
+                <div className="font-mono text-[14px] text-[#808080] mt-2">{formatN(t.amount)} DEGEN</div>
               </div>
             );
           })}
@@ -86,7 +86,7 @@ export default function TokenSection() {
 
         {/* Stacked bar visualization */}
         <div className="max-w-4xl mx-auto">
-          <div className="font-pixel text-[8px] text-[#808080] mb-2 tracking-[0.15em]">SUPPLY DISTRIBUTION · 1,000,000,000 dBET</div>
+          <div className="font-pixel text-[8px] text-[#808080] mb-2 tracking-[0.15em]">SUPPLY DISTRIBUTION · 1,000,000,000 DEGEN</div>
           <div className="flex h-8 border-2 border-[#1f1f1f]">
             {info.tokenomics.map(t => (
               <div key={t.label} style={{ width: `${t.pct}%`, background: t.color }}

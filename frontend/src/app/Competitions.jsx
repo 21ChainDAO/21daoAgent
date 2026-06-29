@@ -3,7 +3,7 @@ import { api, fmtUsd } from '../lib/api';
 import { useAppUser } from './UserSync';
 import { Swords, Crown, Trophy, Users } from 'lucide-react';
 
-function formatDbet(n) {
+function formatDegen(n) {
   if (!n) return '0';
   if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
   if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
@@ -93,8 +93,8 @@ function CompCard({ comp, board, onJoin, busy, realBalance }) {
         <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-3">
           <div className="font-pixel text-[7px] text-[#808080]">PRIZE POOL</div>
           <div className="font-pixel text-[18px] glow-green">{fmtUsd(comp.prize_pool_usd)}</div>
-          {comp.prize_pool_dbet && (
-            <div className="font-pixel text-[10px] text-[#ffe93d] mt-1">+ {formatDbet(comp.prize_pool_dbet)} dBET</div>
+          {comp.prize_pool_degen && (
+            <div className="font-pixel text-[10px] text-[#ffe93d] mt-1">+ {formatDegen(comp.prize_pool_degen)} DEGEN</div>
           )}
         </div>
         <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-3">
@@ -115,9 +115,9 @@ function CompCard({ comp, board, onJoin, busy, realBalance }) {
                 <span className="text-white">
                   {p.amount_each ? `${fmtUsd(p.amount_each)} each` : fmtUsd(p.amount)}
                 </span>
-                {(p.dbet || p.dbet_each) && (
+                {(p.degen || p.degen_each) && (
                   <span className="text-[#ffe93d] ml-2">
-                    + {formatDbet(p.dbet_each || p.dbet)} dBET{p.dbet_each ? ' ea' : ''}
+                    + {formatDegen(p.degen_each || p.degen)} DEGEN{p.degen_each ? ' ea' : ''}
                   </span>
                 )}
               </span>

@@ -1,38 +1,38 @@
 import React, { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 
-// Placeholder until $dBET launches. Swap this constant once the contract is live.
-const DBET_CA = 'TBA';
+// Placeholder until $DEGEN launches. Swap this constant once the contract is live.
+const DEGEN_CA = 'TBA';
 
 /**
- * Fixed bottom-right pixel-card showing the $dBET contract address.
+ * Fixed bottom-right pixel-card showing the $DEGEN contract address.
  * Styled like the Features cards (NO SLIPPAGE etc.) but smaller/thinner.
  * Permanently sits where the platform watermark would be.
  */
 export default function CaBadge() {
   const [copied, setCopied] = useState(false);
-  const isLive = DBET_CA && DBET_CA !== 'TBA';
+  const isLive = DEGEN_CA && DEGEN_CA !== 'TBA';
 
   const handleCopy = async (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (!isLive) return;
     try {
-      await navigator.clipboard.writeText(DBET_CA);
+      await navigator.clipboard.writeText(DEGEN_CA);
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch (_) { /* noop */ }
   };
 
   const short = isLive
-    ? `${DBET_CA.slice(0, 4)}...${DBET_CA.slice(-4)}`
+    ? `${DEGEN_CA.slice(0, 4)}...${DEGEN_CA.slice(-4)}`
     : 'TBA';
 
   return (
     <button
       data-testid="ca-badge"
       onClick={handleCopy}
-      title={isLive ? `Copy $dBET contract: ${DBET_CA}` : '$dBET contract address coming soon'}
+      title={isLive ? `Copy $DEGEN contract: ${DEGEN_CA}` : '$DEGEN contract address coming soon'}
       style={{
         position: 'fixed',
         bottom: 16,
@@ -55,7 +55,7 @@ export default function CaBadge() {
       onMouseEnter={(e) => { e.currentTarget.style.transform = 'translate(-1px,-1px)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
     >
-      <span style={{ fontSize: 7, color: '#00FF29', letterSpacing: 1 }}>$dBET</span>
+      <span style={{ fontSize: 7, color: '#00FF29', letterSpacing: 1 }}>$DEGEN</span>
       <span style={{
         fontFamily: 'monospace',
         fontSize: 11,

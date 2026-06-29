@@ -7,7 +7,7 @@ const links = [
   { label: 'TRADE', to: '/app/trade' },
   { label: 'COMPETITIONS', to: '/app/competitions' },
   { label: 'LEADERBOARD', to: '/app/leaderboard' },
-  { label: '$DBET', to: '/#token' },
+  { label: '$DEGEN', to: '/#token' },
   { label: 'DOCS', to: '/docs' },
 ];
 

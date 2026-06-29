@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import PixelDegen from './PixelDegen';
 import { ArrowRight, Terminal } from 'lucide-react';
 
@@ -46,9 +47,9 @@ export default function Hero() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 mt-10">
-            <button className="pixel-btn pixel-btn-primary">
+            <Link to="/app" className="pixel-btn pixel-btn-primary">
               LAUNCH APP <ArrowRight className="ml-2" size={14} />
-            </button>
+            </Link>
             <button className="pixel-btn pixel-btn-secondary">
               <Terminal size={14} className="mr-2" /> READ DOCS
             </button>

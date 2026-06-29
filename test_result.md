@@ -101,3 +101,168 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Degens.bet - A paper trading platform for crypto with real-time prices, positions management, and leaderboard"
+
+backend:
+  - task: "Root API endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "GET /api/ returns correct message 'degens.bet api'. Test passed."
+
+  - task: "Market prices endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "GET /api/markets/prices returns all 7 pairs (SOL/USD, BTC/USD, ETH/USD, BONK/USD, WIF/USD, JUP/USD, PEPE/USD) with correct structure (pair, symbol, price>0, change_24h, updated_at). Test passed."
+
+  - task: "Single price endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "GET /api/markets/price/SOL/USD returns single price object with all required fields. Test passed."
+
+  - task: "User upsert endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "POST /api/users/upsert creates user with balance=10000, total_pnl=0, trades_count=0. Calling again with same privy_id correctly updates without duplication. Test passed."
+
+  - task: "Get current user endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "GET /api/users/me with X-Privy-Id header returns correct user data. Test passed."
+
+  - task: "Open position endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "POST /api/positions/open creates position with correct size (margin*leverage=1000), entry_price>0, status='open'. User balance decreased by margin (100) to 9900 and trades_count incremented to 1. Test passed."
+
+  - task: "Get open positions endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "GET /api/positions/me?status=open returns open positions with mark_price and unrealized_pnl fields correctly populated. Test passed."
+
+  - task: "Close position endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "POST /api/positions/close closes position with status='closed', sets exit_price, computes pnl correctly. User balance updated appropriately (margin + pnl added back). Test passed."
+
+  - task: "API validation rules"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "All validations working: (a) margin > balance returns 400 'insufficient balance', (b) leverage=2000 returns 400, (c) side='sideways' returns 400, (d) non-existent privy_id returns 404. Test passed."
+
+  - task: "Leaderboard endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "GET /api/leaderboard returns sorted list (by total_pnl desc) with rank, x_handle, x_name, x_avatar, balance, total_pnl, trades_count, win_rate. QA user appears in leaderboard. Test passed."
+
+  - task: "Landing stats endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "GET /api/stats/landing returns all required fields: users, trades, total_volume, monthly_volume, max_leverage=1000, uptime=99.98. All values are correct types. Test passed."
+
+frontend:
+  - task: "Frontend UI"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/App.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Frontend testing not performed as per system instructions (testing agent only tests backend)."
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "All backend API endpoints tested and verified"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "testing"
+    message: "Completed comprehensive backend API testing. All 11 test scenarios passed successfully. Tested: root endpoint, market prices (all 7 pairs), single price lookup, user upsert (create & update without duplication), get current user, open position (with balance deduction), get open positions (with mark_price and unrealized_pnl), close position (with pnl calculation and balance update), all validation rules (insufficient balance, invalid leverage, invalid side, non-existent user), leaderboard (sorted by total_pnl), and landing stats. Backend is fully functional and ready for production."

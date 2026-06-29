@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
+import axios from 'axios';
 import { stats, chartBars } from '../mock';
 import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const months = ['JAN','FEB','MAR','APRIL','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 
@@ -26,12 +29,22 @@ export default function StatsSection() {
   const [idx, setIdx] = useState(months.indexOf(stats.month));
   const ref = useRef(null);
   const [inView, setInView] = useState(false);
+  const [monthlyVolume, setMonthlyVolume] = useState(stats.monthlyVolume);
   useEffect(() => {
     const obs = new IntersectionObserver(([e]) => e.isIntersecting && setInView(true), { threshold: 0.3 });
     if (ref.current) obs.observe(ref.current);
     return () => obs.disconnect();
   }, []);
-  const count = useCountUp(stats.monthlyVolume, 2200, inView);
+  useEffect(() => {
+    axios.get(`${API}/stats/landing`)
+      .then(r => {
+        const v = r.data.monthly_volume;
+        // if we have real data, use it; otherwise keep the mock seed for visual impact
+        if (v && v > 0) setMonthlyVolume(v);
+      })
+      .catch(() => {});
+  }, []);
+  const count = useCountUp(monthlyVolume, 2200, inView);
 
   return (
     <section ref={ref} className="relative z-10 py-28">

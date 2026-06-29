@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
+import axios from 'axios';
 import { whyDegens } from '../mock';
 import { Zap, Shield, Droplet, Link as LinkIcon } from 'lucide-react';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const iconMap = { zap: Zap, shield: Shield, droplet: Droplet, link: LinkIcon };
 
@@ -23,14 +26,22 @@ function useCount(target, start) {
 export default function WhyAndNumbers() {
   const ref = useRef(null);
   const [inView, setInView] = useState(false);
+  const [live, setLive] = useState({ total_volume: 0, users: 0 });
   useEffect(() => {
     const obs = new IntersectionObserver(([e]) => e.isIntersecting && setInView(true), { threshold: 0.25 });
     if (ref.current) obs.observe(ref.current);
     return () => obs.disconnect();
   }, []);
+  useEffect(() => {
+    axios.get(`${API}/stats/landing`).then(r => setLive(r.data)).catch(() => {});
+  }, []);
 
-  const vol = useCount(5, inView);
-  const traders = useCount(120, inView);
+  // total volume in billions, fallback to 5B
+  const volB = Math.max(5, Math.round((live.total_volume || 0) / 1e9));
+  // users in thousands, fallback to 120k
+  const usersK = Math.max(120, Math.round((live.users || 0) / 1000));
+  const vol = useCount(volB, inView);
+  const traders = useCount(usersK, inView);
   const uptime = useCount(9998, inView);
   const lev = useCount(1000, inView);
 

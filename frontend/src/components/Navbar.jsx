@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import PixelLogo from './PixelLogo';
 import { Menu, X } from 'lucide-react';
 
@@ -28,8 +29,8 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden md:flex items-center gap-3">
-          <button className="pixel-btn pixel-btn-secondary !py-2 !px-4 !text-[9px]">CONNECT</button>
-          <button className="pixel-btn pixel-btn-primary !py-2 !px-4 !text-[9px]">LAUNCH APP</button>
+          <Link to="/app" className="pixel-btn pixel-btn-secondary !py-2 !px-4 !text-[9px]">CONNECT</Link>
+          <Link to="/app" className="pixel-btn pixel-btn-primary !py-2 !px-4 !text-[9px]">LAUNCH APP</Link>
         </div>
 
         <button className="md:hidden text-[#00FF29]" onClick={() => setOpen(!open)}>
@@ -43,8 +44,8 @@ export default function Navbar() {
             <a key={l} href="#" className="font-pixel text-[10px] text-[#808080]" onClick={(e)=>e.preventDefault()}>{l}</a>
           ))}
           <div className="flex gap-3 mt-2">
-            <button className="pixel-btn pixel-btn-secondary !py-2 !px-4 !text-[9px]">CONNECT</button>
-            <button className="pixel-btn pixel-btn-primary !py-2 !px-4 !text-[9px]">LAUNCH</button>
+            <Link to="/app" className="pixel-btn pixel-btn-secondary !py-2 !px-4 !text-[9px]">CONNECT</Link>
+            <Link to="/app" className="pixel-btn pixel-btn-primary !py-2 !px-4 !text-[9px]">LAUNCH</Link>
           </div>
         </div>
       )}

@@ -9,6 +9,7 @@ import Features from './components/Features';
 import TradingPreview from './components/TradingPreview';
 import WhyAndNumbers from './components/WhyAndNumbers';
 import Footer from './components/Footer';
+import AppPortal from './app/AppPortal';
 
 function Landing() {
   return (
@@ -32,6 +33,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/app/*" element={<AppPortal />} />
       </Routes>
     </BrowserRouter>
   );

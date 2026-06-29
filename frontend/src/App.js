@@ -14,6 +14,7 @@ import AppPortal from './app/AppPortal';
 import Docs from './pages/Docs';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
+import CaBadge from './components/CaBadge';
 
 function Landing() {
   return (
@@ -43,6 +44,7 @@ function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/app/*" element={<AppPortal />} />
       </Routes>
+      <CaBadge />
     </BrowserRouter>
   );
 }

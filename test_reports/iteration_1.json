@@ -1,0 +1,42 @@
+{
+  "summary": "Verified $dBET -> $DEGEN rename + live contract address fix across backend /api/token, landing Token section, /docs page section 7, and the global CA badge. All 6 review-request checks PASS. 3/3 pytest tests pass; full Playwright UI walkthrough PASS on preview env.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_token_endpoint.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py line 1126: hardcoded contract fallback is acceptable for production safety but consider documenting in a constant at top of file or in a config module for easier rotation.",
+    "TokenSection.jsx & CaBadge.jsx duplicate the literal 'BkEqYRg...pump' / clipboard-copy logic — could be extracted into a shared util/hook (low priority)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_token_endpoint.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "n/a — /api/token is public, no auth required",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend /api/token returns DEGEN symbol + live CA 'BkEqYRg7CqHwuEeUk1eyvAurcaUMzT9R1Xi3ZByspump' and 4-bucket tokenomics (50/7/3/40). Landing Token section shows live CA in green with visible COPY button, heading 'POWERED BY $DEGEN', 4 tokenomics tiles labeled in DEGEN, and 'SUPPLY DISTRIBUTION · 1,000,000,000 DEGEN'. Docs page section 7 shows the live CA inside <code> tag with the four bullets. Global CA badge (data-testid='ca-badge') renders fixed bottom-right with '$DEGEN' label + truncated 'BkEq...pump', hover lifts (transform changes), click copies full CA to clipboard (verified via clipboard.readText). No TBA placeholder remains anywhere on the verified surfaces.",
+  "verification_details": {
+    "backend_api": {
+      "endpoint": "/api/token",
+      "symbol": "DEGEN",
+      "contract": "BkEqYRg7CqHwuEeUk1eyvAurcaUMzT9R1Xi3ZByspump",
+      "tokenomics_buckets": 4,
+      "no_auth_required": true
+    },
+    "landing_token_section": "live CA in green, COPY button visible, heading 'POWERED BY $DEGEN', 4 tiles each labeled '... DEGEN', supply line '1,000,000,000 DEGEN', zero 'dBET' references",
+    "docs_page": "Section 7 '$DEGEN TOKEN' has 4 bullets (50% Locked / 7% Real-arena / 3% Paper-arena / 40% Public fair launch); live CA shown inside <code> tag; no 'TBA' anywhere on page",
+    "ca_badge": "data-testid='ca-badge' visible on / and /docs; shows '$DEGEN' + 'CA: BkEq...pump'; hover triggers transform change; click copied full CA 'BkEqYRg7CqHwuEeUk1eyvAurcaUMzT9R1Xi3ZByspump' to clipboard"
+  }
+}

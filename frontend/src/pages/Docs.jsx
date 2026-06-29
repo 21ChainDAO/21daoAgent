@@ -55,7 +55,7 @@ export default function Docs() {
         <li>3% Paper-arena prize pool</li>
         <li>40% Public fair launch</li>
       </ul>
-      <p>Contract address: <code>TBA</code> &mdash; published in the token section on the homepage at launch, and pinned permanently in the bottom-right of every page once live.</p>
+      <p>Contract address: <code>BkEqYRg7CqHwuEeUk1eyvAurcaUMzT9R1Xi3ZByspump</code> &mdash; pinned permanently in the bottom-right of every page.</p>
 
       <h2>8. RISK</h2>
       <p>Trading with leverage is risky. PnL is calculated on real market prices, but liquidity for execution is provided by the platform; you are entering a wager-style instrument against the house, not the open market. Do not deposit more than you are willing to lose. See <a href="/terms">Terms</a> and <a href="/privacy">Privacy</a>.</p>

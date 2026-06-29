@@ -438,10 +438,32 @@ async def liquidation_loop():
             log.warning("liquidation loop err: %s", e)
         await asyncio.sleep(LIQUIDATION_INTERVAL_SECONDS)
 
+async def ensure_indexes():
+    """Create indexes for the hot queries — leaderboards, sweep loop, positions, withdrawals."""
+    try:
+        # User lookups
+        await db.users.create_index("privy_id", unique=True)
+        await db.users.create_index("custodial_address")
+        await db.users.create_index([("paper.total_pnl", -1)])
+        await db.users.create_index([("real.total_pnl", -1)])
+        # Positions
+        await db.positions.create_index([("user_id", 1), ("status", 1)])
+        await db.positions.create_index("status")
+        await db.positions.create_index("id", unique=True)
+        # Withdrawals
+        await db.withdrawals.create_index([("user_id", 1), ("requested_at", -1)])
+        await db.withdrawals.create_index("status")
+        # Competitions
+        await db.competitions.create_index("id", unique=True)
+        await db.competition_entries.create_index([("competition_id", 1), ("user_id", 1)])
+    except Exception as e:
+        log.warning("index creation skipped: %s", e)
+
 # ---------------- App startup ----------------
 @app.on_event("startup")
 async def on_start():
     global _PRICE_TASK, _SWEEP_TASK, _LIQUIDATION_TASK
+    await ensure_indexes()
     _PRICE_TASK = asyncio.create_task(price_loop())
     _SWEEP_TASK = asyncio.create_task(sweep_loop())
     _LIQUIDATION_TASK = asyncio.create_task(liquidation_loop())

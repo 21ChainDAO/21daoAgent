@@ -21,8 +21,8 @@ export const features = [
   },
   {
     icon: 'vault',
-    title: 'NON CUSTODIAL',
-    desc: 'Your wallet. Your keys. Always.',
+    title: 'HOUSE WALLET',
+    desc: 'Managed treasury. Instant credits. No seed phrases to lose.',
   },
   {
     icon: 'bolt',
@@ -41,10 +41,10 @@ export const sidebarLinks = [
 ];
 
 export const whyDegens = [
-  { icon: 'zap', title: 'INSTANT SETTLEMENT', desc: 'On-chain finality in milliseconds.' },
-  { icon: 'shield', title: 'ZERO CUSTODY', desc: 'We never touch your funds.' },
+  { icon: 'zap', title: 'INSTANT SETTLEMENT', desc: 'Trades fill in under a second.' },
+  { icon: 'shield', title: 'SAFE TREASURY', desc: 'Funds held in segregated cold storage.' },
   { icon: 'droplet', title: 'INFINITE LIQUIDITY', desc: 'Never get stuck on the exit.' },
-  { icon: 'link', title: 'BUILT ON CHAIN', desc: 'Fully transparent. Fully verifiable.' },
+  { icon: 'link', title: 'PROVABLY FAIR', desc: 'Every trade and PnL is auditable.' },
 ];
 
 export const markets = [

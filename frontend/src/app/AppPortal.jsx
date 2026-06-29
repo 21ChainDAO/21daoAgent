@@ -12,6 +12,7 @@ import TradeView from './TradeView';
 import Leaderboard from './Leaderboard';
 import Competitions from './Competitions';
 import WalletPage from './WalletPage';
+import AdminPage from './AdminPage';
 
 function Guard({ children }) {
   const { ready, authenticated } = usePrivy();
@@ -48,6 +49,7 @@ export default function AppPortal() {
                   <Route path="competitions" element={<Competitions />} />
                   <Route path="leaderboard" element={<Leaderboard />} />
                   <Route path="wallet" element={<WalletPage />} />
+                  <Route path="admin" element={<AdminPage />} />
                   <Route path="*" element={<Navigate to="/app" replace />} />
                 </Routes>
               </AppShell>

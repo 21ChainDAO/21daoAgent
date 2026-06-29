@@ -16,7 +16,7 @@ export default function Footer() {
           <div className="md:col-span-5">
             <img src="/img/degens-logo.png" alt="DegensBet" className="h-12 pixelated" />
             <p className="font-mono text-[18px] text-[#808080] mt-4 max-w-sm">
-              An on-chain casino for the screen-burned. Built by degens, for degens.
+              The pixel arcade for crypto degenerates. High stakes. Higher payouts.
             </p>
             <div className="flex gap-3 mt-6">
               {[Twitter, Github, MessageCircle, Send].map((Icon, i) => (

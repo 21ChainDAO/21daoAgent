@@ -16,7 +16,7 @@ export default function Login() {
 
         <p className="font-mono text-[18px] text-[#808080] mb-8 leading-snug">
           Connect your X account to enter the arcade.<br/>
-          A non-custodial wallet will be auto-provisioned.
+          A managed deposit wallet will be provisioned instantly.
         </p>
 
         <button onClick={login} disabled={!ready}

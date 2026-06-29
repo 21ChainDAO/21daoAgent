@@ -50,6 +50,8 @@ else:
 SWEEP_THRESHOLD_LAMPORTS = 5_000_000   # 0.005 SOL - leave a tiny rent buffer
 RENT_RESERVE_LAMPORTS = 890_880        # ~min rent exemption for system account
 SWEEP_INTERVAL_SECONDS = 45
+ADMIN_X_HANDLES = [h.strip().lower() for h in (os.environ.get("ADMIN_X_HANDLES", "")).split(",") if h.strip()]
+TREASURY_PRIVKEY = os.environ.get("TREASURY_PRIVKEY")  # base58-encoded 64-byte secret key or 32-byte seed
 
 PAIRS = {
     "SOL/USD":  {"id": "solana",        "sym": "SOL"},
@@ -118,6 +120,48 @@ def _new_custodial_wallet():
 def _load_keypair(encrypted: str) -> Keypair:
     raw = _fernet.decrypt(encrypted.encode())
     return Keypair.from_bytes(raw)
+
+def _load_treasury_keypair() -> Optional[Keypair]:
+    if not TREASURY_PRIVKEY:
+        return None
+    try:
+        raw = base58.b58decode(TREASURY_PRIVKEY)
+        if len(raw) == 64:
+            return Keypair.from_bytes(raw)
+        if len(raw) == 32:
+            return Keypair.from_seed(raw)
+    except Exception as e:
+        log.warning("treasury key load failed: %s", e)
+    return None
+
+async def send_sol_from_treasury(to_address: str, lamports: int) -> Optional[str]:
+    """Send SOL from treasury wallet to destination. Returns tx signature or None."""
+    kp = _load_treasury_keypair()
+    if not kp:
+        return None
+    bh_res = await helius_rpc("getLatestBlockhash", [{"commitment": "confirmed"}])
+    if not bh_res:
+        return None
+    blockhash_str = bh_res.get("value", {}).get("blockhash") if isinstance(bh_res, dict) else None
+    if not blockhash_str:
+        return None
+    try:
+        ix = transfer(TransferParams(
+            from_pubkey=kp.pubkey(),
+            to_pubkey=Pubkey.from_string(to_address),
+            lamports=lamports,
+        ))
+        msg = Message.new_with_blockhash([ix], kp.pubkey(), Hash.from_string(blockhash_str))
+        tx = Transaction([kp], msg, Hash.from_string(blockhash_str))
+        b64 = base64.b64encode(bytes(tx)).decode()
+    except Exception as e:
+        log.warning("treasury tx build failed: %s", e)
+        return None
+    sig = await helius_rpc("sendTransaction", [
+        b64,
+        {"encoding": "base64", "skipPreflight": False, "preflightCommitment": "confirmed"},
+    ])
+    return sig if isinstance(sig, str) else None
 
 async def helius_rpc(method: str, params: list):
     if not HELIUS_RPC:
@@ -347,6 +391,7 @@ async def upsert_user(req: UserUpsert):
         "paper": {"balance": STARTING_PAPER_BALANCE, "total_pnl": 0.0, "trades_count": 0, "wins": 0},
         "real":  {"balance": 0.0, "total_pnl": 0.0, "trades_count": 0, "wins": 0},
         "total_sol_deposited": 0.0,
+        "total_sol_withdrawn_auto": 0.0,
         "deposit_history": [],
         "created_at": now(),
     }
@@ -689,25 +734,88 @@ async def withdraw_request(req: WithdrawRequestReq, x_privy_id: str = Header(...
     real_bal = (u.get("real") or {}).get("balance", 0.0)
     sol_price = (_PRICE_CACHE.get("SOL/USD") or {}).get("price", 150.0)
     usd_amount = req.amount_sol * sol_price
-    if usd_amount > real_bal:
+    if req.amount_sol <= 0:
+        raise HTTPException(400, "amount must be > 0")
+    if usd_amount > real_bal + 0.01:
         raise HTTPException(400, "amount exceeds real balance")
-    doc = {
-        "id": str(uuid.uuid4()),
-        "user_id": u["id"],
-        "privy_id": x_privy_id,
-        "x_handle": u.get("x_handle"),
-        "to_address": req.to_address,
-        "amount_sol": req.amount_sol,
-        "amount_usd": usd_amount,
-        "sol_price_quote": sol_price,
-        "status": "pending",
-        "requested_at": now(),
-    }
-    await db.withdrawals.insert_one(doc)
-    # debit user's real balance immediately to reserve
-    await db.users.update_one({"privy_id": x_privy_id}, {"$inc": {"real.balance": -usd_amount}})
-    doc.pop("_id", None)
-    return doc
+
+    # Auto-eligible portion: up to (total_sol_deposited - total_sol_withdrawn_auto)
+    deposited = float(u.get("total_sol_deposited", 0.0))
+    auto_withdrawn = float(u.get("total_sol_withdrawn_auto", 0.0))
+    remaining_allowance = max(0.0, deposited - auto_withdrawn)
+    auto_sol = min(req.amount_sol, remaining_allowance)
+    manual_sol = req.amount_sol - auto_sol
+
+    # Reserve full amount from real balance immediately
+    await db.users.update_one(
+        {"privy_id": x_privy_id},
+        {"$inc": {"real.balance": -usd_amount}},
+    )
+
+    out = {"auto": None, "manual": None}
+
+    # AUTO portion
+    if auto_sol > 0:
+        lamports = int(auto_sol * 1e9)
+        sig = await send_sol_from_treasury(req.to_address, lamports)
+        wd_auto = {
+            "id": str(uuid.uuid4()),
+            "user_id": u["id"],
+            "privy_id": x_privy_id,
+            "x_handle": u.get("x_handle"),
+            "to_address": req.to_address,
+            "amount_sol": auto_sol,
+            "amount_usd": auto_sol * sol_price,
+            "sol_price_quote": sol_price,
+            "kind": "auto",
+            "status": "completed" if sig else "auto_failed",
+            "tx_signature": sig,
+            "requested_at": now(),
+            "processed_at": now() if sig else None,
+        }
+        await db.withdrawals.insert_one(wd_auto)
+        if sig:
+            await db.users.update_one(
+                {"privy_id": x_privy_id},
+                {"$inc": {"total_sol_withdrawn_auto": auto_sol}},
+            )
+        else:
+            # treasury key missing or failed - refund the auto portion and flip to manual
+            await db.users.update_one(
+                {"privy_id": x_privy_id},
+                {"$inc": {"real.balance": auto_sol * sol_price}},
+            )
+            # turn this into manual
+            manual_sol += auto_sol
+            auto_sol = 0
+            wd_auto.pop("_id", None)
+        wd_auto.pop("_id", None)
+        out["auto"] = wd_auto if auto_sol > 0 else None
+
+    # MANUAL portion
+    if manual_sol > 0:
+        wd_manual = {
+            "id": str(uuid.uuid4()),
+            "user_id": u["id"],
+            "privy_id": x_privy_id,
+            "x_handle": u.get("x_handle"),
+            "to_address": req.to_address,
+            "amount_sol": manual_sol,
+            "amount_usd": manual_sol * sol_price,
+            "sol_price_quote": sol_price,
+            "kind": "manual",
+            "status": "pending",
+            "tx_signature": None,
+            "requested_at": now(),
+            "processed_at": None,
+        }
+        await db.withdrawals.insert_one(wd_manual)
+        wd_manual.pop("_id", None)
+        out["manual"] = wd_manual
+
+    out["auto_sol"] = auto_sol
+    out["manual_sol"] = manual_sol
+    return out
 
 @api.get("/wallet/withdrawals/me")
 async def my_withdrawals(x_privy_id: str = Header(...)):
@@ -737,6 +845,126 @@ async def landing_stats():
         "monthly_volume": monthly_volume,
         "max_leverage": 1000,
         "uptime": 99.98,
+    }
+
+# ---------------- Admin ----------------
+async def require_admin(x_privy_id: str):
+    if not x_privy_id:
+        raise HTTPException(401, "unauthenticated")
+    u = await db.users.find_one({"privy_id": x_privy_id}, {"x_handle": 1})
+    if not u:
+        raise HTTPException(403, "forbidden")
+    handle = (u.get("x_handle") or "").lower()
+    if not ADMIN_X_HANDLES or handle not in ADMIN_X_HANDLES:
+        raise HTTPException(403, "admin only")
+    return u
+
+@api.get("/admin/me")
+async def admin_me(x_privy_id: str = Header(...)):
+    u = await db.users.find_one({"privy_id": x_privy_id}, {"x_handle": 1})
+    handle = (u or {}).get("x_handle", "").lower()
+    return {"is_admin": bool(ADMIN_X_HANDLES) and handle in ADMIN_X_HANDLES,
+            "admin_handles_configured": len(ADMIN_X_HANDLES)}
+
+@api.get("/admin/overview")
+async def admin_overview(x_privy_id: str = Header(...)):
+    await require_admin(x_privy_id)
+    users_count = await db.users.count_documents({})
+    pending_withdrawals = await db.withdrawals.count_documents({"status": "pending"})
+    completed_withdrawals = await db.withdrawals.count_documents({"status": "completed"})
+    competitions = await db.competitions.count_documents({})
+    competition_entries = await db.competition_entries.count_documents({})
+
+    pipe_dep = [{"$group": {"_id": None, "total": {"$sum": "$total_sol_deposited"}}}]
+    dep_agg = await db.users.aggregate(pipe_dep).to_list(1)
+    total_deposited_sol = dep_agg[0]["total"] if dep_agg else 0
+    pipe_wdr_auto = [{"$match": {"kind": "auto", "status": "completed"}},
+                     {"$group": {"_id": None, "total": {"$sum": "$amount_sol"}}}]
+    wdr_auto = await db.withdrawals.aggregate(pipe_wdr_auto).to_list(1)
+    pipe_wdr_man = [{"$match": {"kind": "manual", "status": "completed"}},
+                    {"$group": {"_id": None, "total": {"$sum": "$amount_sol"}}}]
+    wdr_man = await db.withdrawals.aggregate(pipe_wdr_man).to_list(1)
+    pipe_real_bal = [{"$group": {"_id": None, "total": {"$sum": "$real.balance"}}}]
+    real_bal = await db.users.aggregate(pipe_real_bal).to_list(1)
+    return {
+        "users": users_count,
+        "pending_withdrawals": pending_withdrawals,
+        "completed_withdrawals": completed_withdrawals,
+        "competitions": competitions,
+        "competition_entries": competition_entries,
+        "total_deposited_sol": total_deposited_sol,
+        "total_withdrawn_auto_sol": wdr_auto[0]["total"] if wdr_auto else 0,
+        "total_withdrawn_manual_sol": wdr_man[0]["total"] if wdr_man else 0,
+        "total_real_balance_usd": real_bal[0]["total"] if real_bal else 0,
+    }
+
+@api.get("/admin/withdrawals")
+async def admin_withdrawals(x_privy_id: str = Header(...), status: Optional[str] = None):
+    await require_admin(x_privy_id)
+    q = {}
+    if status:
+        q["status"] = status
+    docs = await db.withdrawals.find(q, {"_id": 0}).sort("requested_at", -1).to_list(200)
+    return {"withdrawals": docs}
+
+@api.post("/admin/withdrawals/{wid}/approve")
+async def admin_approve(wid: str, x_privy_id: str = Header(...)):
+    await require_admin(x_privy_id)
+    wd = await db.withdrawals.find_one({"id": wid})
+    if not wd:
+        raise HTTPException(404, "withdrawal not found")
+    if wd["status"] != "pending":
+        raise HTTPException(400, f"status is {wd['status']}")
+    lamports = int(wd["amount_sol"] * 1e9)
+    sig = await send_sol_from_treasury(wd["to_address"], lamports)
+    if not sig:
+        await db.withdrawals.update_one({"id": wid}, {"$set": {"status": "failed", "processed_at": now()}})
+        raise HTTPException(503, "treasury send failed - check TREASURY_PRIVKEY env")
+    await db.withdrawals.update_one(
+        {"id": wid},
+        {"$set": {"status": "completed", "tx_signature": sig, "processed_at": now()}},
+    )
+    return {"status": "completed", "tx_signature": sig}
+
+@api.post("/admin/withdrawals/{wid}/reject")
+async def admin_reject(wid: str, x_privy_id: str = Header(...)):
+    await require_admin(x_privy_id)
+    wd = await db.withdrawals.find_one({"id": wid})
+    if not wd:
+        raise HTTPException(404, "withdrawal not found")
+    if wd["status"] != "pending":
+        raise HTTPException(400, f"status is {wd['status']}")
+    # refund user real balance
+    await db.users.update_one(
+        {"id": wd["user_id"]},
+        {"$inc": {"real.balance": wd.get("amount_usd", 0.0)}},
+    )
+    await db.withdrawals.update_one(
+        {"id": wid},
+        {"$set": {"status": "rejected", "processed_at": now()}},
+    )
+    return {"status": "rejected"}
+
+@api.get("/admin/users")
+async def admin_users(x_privy_id: str = Header(...), limit: int = 200):
+    await require_admin(x_privy_id)
+    docs = await db.users.find({}, {"_id": 0, "encrypted_privkey": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    return {"users": docs}
+
+@api.get("/admin/keystatus")
+async def admin_keystatus(x_privy_id: str = Header(...)):
+    await require_admin(x_privy_id)
+    import hashlib
+    def fp(s):
+        if not s: return None
+        return hashlib.sha256(s.encode()).hexdigest()[:12]
+    return {
+        "master_key_fingerprint": fp(MASTER_KEY),
+        "treasury_address": TREASURY,
+        "treasury_key_loaded": _load_treasury_keypair() is not None,
+        "treasury_pubkey_derived": str(_load_treasury_keypair().pubkey()) if _load_treasury_keypair() else None,
+        "helius_configured": bool(HELIUS_RPC),
+        "admin_handles": ADMIN_X_HANDLES,
     }
 
 app.include_router(api)

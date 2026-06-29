@@ -68,8 +68,13 @@ export default function WalletPage() {
   const requestWithdrawal = async () => {
     setWdMsg(''); setWdBusy(true);
     try {
-      await api.post('/wallet/withdraw_request', { to_address: wdAddr, amount_sol: Number(wdAmount) });
-      setWdMsg('✓ WITHDRAWAL REQUESTED • PROCESSED MANUALLY WITHIN 24H');
+      const r = await api.post('/wallet/withdraw_request', { to_address: wdAddr, amount_sol: Number(wdAmount) });
+      const auto = r.data.auto_sol || 0;
+      const manual = r.data.manual_sol || 0;
+      const parts = [];
+      if (auto > 0) parts.push(`AUTO-SENT ${auto.toFixed(4)} SOL`);
+      if (manual > 0) parts.push(`${manual.toFixed(4)} SOL UNDER REVIEW (1-3H)`);
+      setWdMsg('✓ ' + parts.join(' · '));
       setWdAddr(''); setWdAmount('');
       await refresh();
       await loadWithdrawals();
@@ -77,9 +82,17 @@ export default function WalletPage() {
       setWdMsg(e.response?.data?.detail || 'REQUEST FAILED');
     } finally {
       setWdBusy(false);
-      setTimeout(() => setWdMsg(''), 6000);
+      setTimeout(() => setWdMsg(''), 8000);
     }
   };
+
+  // compute auto/manual preview for current input
+  const requestedSol = Number(wdAmount) || 0;
+  const depositedSol = Number(dbUser?.total_sol_deposited || 0);
+  const autoWithdrawnSol = Number(dbUser?.total_sol_withdrawn_auto || 0);
+  const allowance = Math.max(0, depositedSol - autoWithdrawnSol);
+  const previewAuto = Math.min(requestedSol, allowance);
+  const previewManual = Math.max(0, requestedSol - previewAuto);
 
   return (
     <div className="space-y-5 max-w-4xl">
@@ -160,6 +173,28 @@ export default function WalletPage() {
           </div>
         </div>
 
+        {requestedSol > 0 && (
+          <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-3 mb-3 space-y-1">
+            <div className="flex justify-between font-mono text-[14px]">
+              <span className="text-[#808080]">DEPOSIT ALLOWANCE LEFT</span>
+              <span className="text-white">{allowance.toFixed(4)} SOL</span>
+            </div>
+            <div className="flex justify-between font-mono text-[14px]">
+              <span className="text-[#808080]">INSTANT AUTO-PAYOUT</span>
+              <span className="text-[#00FF29]">{previewAuto.toFixed(4)} SOL</span>
+            </div>
+            {previewManual > 0 && (
+              <div className="flex justify-between font-mono text-[14px]">
+                <span className="text-[#808080]">MANUAL REVIEW (1-3H)</span>
+                <span className="text-[#ffe93d]">{previewManual.toFixed(4)} SOL</span>
+              </div>
+            )}
+            <div className="font-pixel text-[7px] text-[#808080] mt-2">
+              Withdrawals up to your deposited amount are paid instantly. Profits above that go through manual review.
+            </div>
+          </div>
+        )}
+
         <button onClick={requestWithdrawal} disabled={wdBusy || !wdAddr || !wdAmount}
           className="pixel-btn !py-3"
           style={{ background: '#ff3838', color: '#050505', boxShadow: '0 4px 0 0 #7a1717' }}>
@@ -178,7 +213,9 @@ export default function WalletPage() {
                 <th className="text-left py-2">DATE</th>
                 <th className="text-left">TO</th>
                 <th className="text-right">AMOUNT</th>
+                <th className="text-center">KIND</th>
                 <th className="text-right">STATUS</th>
+                <th className="text-right">TX</th>
               </tr>
             </thead>
             <tbody>
@@ -186,11 +223,27 @@ export default function WalletPage() {
                 <tr key={w.id} className="border-b border-[#1f1f1f]/50">
                   <td className="py-2 text-[#808080]">{new Date(w.requested_at).toLocaleDateString()}</td>
                   <td className="text-white">{w.to_address.slice(0,4)}...{w.to_address.slice(-4)}</td>
-                  <td className="text-right text-white">{w.amount_sol} SOL</td>
-                  <td className="text-right">
-                    <span className="font-pixel text-[7px] px-2 py-1 bg-[#0d0d0d] border border-[#ffe93d] text-[#ffe93d]">
-                      {w.status.toUpperCase()}
+                  <td className="text-right text-white">{w.amount_sol.toFixed(4)} SOL</td>
+                  <td className="text-center">
+                    <span className={`font-pixel text-[7px] px-2 py-1 ${w.kind === 'auto' ? 'text-[#00FF29] border border-[#00FF29]' : 'text-[#ffe93d] border border-[#ffe93d]'}`}>
+                      {(w.kind || 'manual').toUpperCase()}
                     </span>
+                  </td>
+                  <td className="text-right">
+                    <span className={`font-pixel text-[7px] px-2 py-1 ${
+                      w.status === 'completed' ? 'bg-[#00FF29] text-[#050505]' :
+                      w.status === 'pending' ? 'bg-[#0d0d0d] text-[#ffe93d] border border-[#ffe93d]' :
+                      w.status === 'rejected' ? 'bg-[#ff3838] text-[#050505]' :
+                      'bg-[#0d0d0d] text-[#ff3838] border border-[#ff3838]'
+                    }`}>{w.status.toUpperCase()}</span>
+                  </td>
+                  <td className="text-right">
+                    {w.tx_signature ? (
+                      <a href={`https://solscan.io/tx/${w.tx_signature}`} target="_blank" rel="noreferrer"
+                        className="text-[#00FF29] hover:underline font-mono text-[12px]">
+                        {w.tx_signature.slice(0,6)}...
+                      </a>
+                    ) : '—'}
                   </td>
                 </tr>
               ))}

@@ -37,13 +37,13 @@ export default function Hero() {
           </h1>
 
           <p className="font-mono text-[22px] md:text-[26px] text-[#F5F5F5] mt-10 max-w-2xl leading-snug">
-            <span className="glow-green">1000X</span> ON-CHAIN FUTURES.{' '}
+            <span className="glow-green">1000X</span> LEVERAGE FUTURES.{' '}
             <span className="glow-green">NO SLIPPAGE.</span>{' '}
-            <span className="glow-green">NO CUSTODY.</span>
+            <span className="glow-green">INSTANT FILLS.</span>
           </p>
 
           <p className="font-mono text-[18px] text-[#808080] mt-4 max-w-md">
-            Trade any market. One click. Built for degens.<br/>Powered by blockchain.
+            Trade any market. One click. Built for degens.<br/>Real money. Real prizes.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 mt-10">

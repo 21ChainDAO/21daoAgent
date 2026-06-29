@@ -383,15 +383,18 @@ backend:
 
   - task: "Withdraw request endpoint"
     implemented: true
-    working: true
+    working: false
     file: "/app/backend/server.py"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
     needs_retesting: false
     status_history:
       - working: true
         agent: "testing"
         comment: "UPGRADED BACKEND: POST /api/wallet/withdraw_request correctly validates real balance. Attempting to withdraw 0.1 SOL with 0 real balance correctly returns 400 'amount exceeds real balance'. Validation working correctly. Test passed."
+      - working: false
+        agent: "testing"
+        comment: "CRITICAL BUG DETECTED in auto-to-manual withdrawal fallback: (1) When TREASURY_PRIVKEY is missing and auto-eligible withdrawal fails, backend REFUNDS the amount to user's balance instead of keeping it reserved for manual withdrawal. User requested 0.5 SOL withdrawal, balance should decrease from 750 to ~713, but remained at 750. (2) Backend creates TWO withdrawal records (auto_failed + manual) instead of ONE manual record. Root cause: Lines 783-789 in server.py refund the auto portion when treasury send fails. FIX NEEDED: Remove the refund logic - funds should remain deducted for the pending manual withdrawal. Validation and insufficient balance checks work correctly."
 
   - task: "User withdrawals endpoint"
     implemented: true
@@ -429,6 +432,42 @@ backend:
         agent: "testing"
         comment: "UPGRADED BACKEND REGRESSION: GET /api/stats/landing still returns all required fields (users, trades, total_volume, monthly_volume, max_leverage, uptime). No regression. Test passed."
 
+  - task: "Admin endpoints (me, overview, withdrawals, keystatus)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "ADMIN ENDPOINTS COMPREHENSIVE TEST: All admin endpoints working correctly. (1) GET /admin/me returns is_admin=false when ADMIN_X_HANDLES empty, is_admin=true after adding user to ADMIN_X_HANDLES env. (2) GET /admin/overview returns 403 for non-admins, returns correct data for admins (users, pending_withdrawals, completed_withdrawals, competitions, competition_entries, total_deposited_sol, total_withdrawn_auto_sol, total_withdrawn_manual_sol, total_real_balance_usd). (3) GET /admin/withdrawals returns 403 for non-admins, returns withdrawal list for admins. (4) GET /admin/keystatus returns 403 for non-admins, returns correct data for admins (master_key_fingerprint=12 chars, treasury_address, treasury_key_loaded=false when TREASURY_PRIVKEY empty, helius_configured=true, admin_handles array). All admin guards working correctly."
+
+  - task: "Admin withdrawal approve/reject"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "ADMIN WITHDRAWAL MANAGEMENT: (1) POST /admin/withdrawals/{id}/approve correctly fails with 503 'treasury send failed' when TREASURY_PRIVKEY is empty, and updates withdrawal status to 'failed'. (2) POST /admin/withdrawals/{id}/reject correctly refunds user's real.balance by the withdrawal amount_usd and updates withdrawal status to 'rejected'. Both endpoints require admin authentication (403 for non-admins). Approve/reject logic working as expected."
+
+  - task: "Auto-withdrawal fallback to manual"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "CRITICAL BUG: Auto-to-manual withdrawal fallback has incorrect balance handling. When TREASURY_PRIVKEY is empty and auto-eligible withdrawal (up to total_sol_deposited allowance) fails, the backend: (1) Correctly calculates auto_sol and manual_sol portions, (2) Correctly attempts treasury send (fails as expected), (3) INCORRECTLY refunds the auto portion to user's balance (lines 783-789 in server.py), (4) Creates both auto_failed and manual withdrawal records. EXPECTED: Funds should remain deducted for the pending manual withdrawal. ACTUAL: Funds are refunded, allowing users to withdraw without balance deduction. FIX: Remove refund logic at lines 783-789, keep balance deducted for manual withdrawal."
+
 frontend:
   - task: "Frontend UI"
     implemented: true
@@ -444,17 +483,17 @@ frontend:
 
 metadata:
   created_by: "testing_agent"
-  version: "1.2"
-  test_sequence: 3
+  version: "1.3"
+  test_sequence: 4
   run_ui: false
 
 test_plan:
   current_focus:
-    - "UPGRADED BACKEND: Dual account system (paper/real) tested and verified"
-    - "UPGRADED BACKEND: Custodial wallets tested and verified"
-    - "UPGRADED BACKEND: Competitions system tested and verified"
-    - "UPGRADED BACKEND: All new endpoints tested and verified"
-  stuck_tasks: []
+    - "CRITICAL: Fix auto-to-manual withdrawal fallback balance refund bug"
+    - "Admin endpoints tested and verified"
+    - "Auto-withdrawal system tested (fallback working, but has balance bug)"
+  stuck_tasks:
+    - "Auto-withdrawal fallback to manual (balance refund bug)"
   test_all: false
   test_priority: "high_first"
 
@@ -465,3 +504,5 @@ agent_communication:
     message: "Completed testing of new Helius wallet endpoints. All 8 new tests passed successfully: (1) GET /api/wallet/balance/{address} with wrapped SOL mint returns SOL=1558.44, USDC=3774.69, (2) with funded mainnet address returns SOL=0.00144768, USDC=0.0, (3) with invalid address gracefully returns SOL=0.0, USDC=0.0, (4) POST /api/wallet/deposit/scan with valid user returns credited=237540.43, scanned=25, (5) with nonexistent user correctly returns 404, (6) with user without wallet correctly returns 400 'no wallet', (7) Regression test confirms GET /api/markets/prices still returns 7 pairs, (8) Regression test confirms GET /api/stats/landing still works. Helius RPC integration is fully functional and querying Solana mainnet successfully."
   - agent: "testing"
     message: "🎉 UPGRADED BACKEND COMPREHENSIVE TEST COMPLETE - ALL 14 TESTS PASSED! Tested major upgrade with dual account system (paper/real sub-accounts), custodial wallet auto-generation, competitions, and new endpoints. VERIFIED: (1) Root endpoint working, (2) User creation with custodial wallet (paper.balance=10000, real.balance=0, custodial_address generated, encrypted_privkey NOT returned, idempotent), (3) GET /users/me returns both sub-accounts, (4) Open position on PAPER account (balance deducted from paper only), (5) Open position on REAL account correctly rejected (insufficient balance), (6) Position listing filtered by account_type (paper/real isolation), (7) Close paper position (balance returned to paper only), (8) Leaderboards by account type (paper/real separate, legacy works), (9) Competitions endpoint (paper-main: 1 SOL entry, $10k pool; real-main: 10 SOL entry, $100k pool), (10) Join competition correctly validates real balance, (11) Withdraw request flow (validation working, withdrawals empty), (12) Force sweep (returns 0 as expected), (13) Competition leaderboard (empty as expected), (14) Regression tests (7 pairs, landing stats). Backend upgrade is FULLY FUNCTIONAL and ready for production."
+  - agent: "testing"
+    message: "🚨 ADMIN + AUTO-WITHDRAWAL ENDPOINTS TEST COMPLETE - CRITICAL BUG FOUND! Tested all 9 scenarios from review request. PASSED: (1) User setup with DB-faked deposits, (2) Admin endpoint guards (403 for non-admins), (3) Admin promotion via ADMIN_X_HANDLES env, (4) Admin overview/withdrawals/keystatus endpoints, (5) Admin approve (correctly fails with 503 when TREASURY_PRIVKEY empty), (6) Admin reject (correctly refunds user), (7) Insufficient balance rejection, (8) Regression (7 pairs, 2 competitions). CRITICAL BUG: Auto-to-manual withdrawal fallback incorrectly refunds balance. When TREASURY_PRIVKEY is empty and auto-eligible withdrawal fails, backend refunds the amount to user's balance (lines 783-789 in server.py) instead of keeping it reserved for the pending manual withdrawal. This allows users to withdraw funds without balance deduction. FIX REQUIRED: Remove the refund logic - balance should remain deducted for manual withdrawal. Also creates duplicate withdrawal records (auto_failed + manual) instead of just manual."

@@ -1,11 +1,10 @@
-import React from 'react';
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { usePrivy } from '@privy-io/react-auth';
 import { useAppUser } from './UserSync';
 import { useAccount } from './AccountContext';
-import { LayoutDashboard, TrendingUp, Trophy, Wallet, LogOut, Copy, Check, Swords } from 'lucide-react';
-import { fmtUsd } from '../lib/api';
+import { LayoutDashboard, TrendingUp, Trophy, Wallet, LogOut, Copy, Check, Swords, ShieldCheck } from 'lucide-react';
+import { api, fmtUsd } from '../lib/api';
 
 const nav = [
   { to: '/app', icon: LayoutDashboard, label: 'DASHBOARD', end: true },
@@ -22,6 +21,12 @@ export default function AppShell({ children }) {
   const loc = useLocation();
   const nav2 = useNavigate();
   const [copied, setCopied] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!dbUser) return;
+    api.get('/admin/me').then(r => setIsAdmin(!!r.data.is_admin)).catch(() => setIsAdmin(false));
+  }, [dbUser]);
 
   const tw = user?.twitter;
   const addr = dbUser?.custodial_address;
@@ -34,6 +39,10 @@ export default function AppShell({ children }) {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const navItems = isAdmin
+    ? [...nav, { to: '/app/admin', icon: ShieldCheck, label: 'ADMIN' }]
+    : nav;
+
   return (
     <div className="min-h-screen scanlines" style={{ background: '#050505' }}>
       <div className="fixed inset-0 grid-bg pointer-events-none" style={{ zIndex: 1 }} />
@@ -45,7 +54,7 @@ export default function AppShell({ children }) {
           </Link>
 
           <nav className="flex flex-col gap-1">
-            {nav.map(n => {
+            {navItems.map(n => {
               const active = n.end ? loc.pathname === n.to : loc.pathname.startsWith(n.to);
               const Icon = n.icon;
               return (

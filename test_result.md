@@ -458,15 +458,18 @@ backend:
 
   - task: "Auto-withdrawal fallback to manual"
     implemented: true
-    working: false
+    working: true
     file: "/app/backend/server.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
       - working: false
         agent: "testing"
         comment: "CRITICAL BUG: Auto-to-manual withdrawal fallback has incorrect balance handling. When TREASURY_PRIVKEY is empty and auto-eligible withdrawal (up to total_sol_deposited allowance) fails, the backend: (1) Correctly calculates auto_sol and manual_sol portions, (2) Correctly attempts treasury send (fails as expected), (3) INCORRECTLY refunds the auto portion to user's balance (lines 783-789 in server.py), (4) Creates both auto_failed and manual withdrawal records. EXPECTED: Funds should remain deducted for the pending manual withdrawal. ACTUAL: Funds are refunded, allowing users to withdraw without balance deduction. FIX: Remove refund logic at lines 783-789, keep balance deducted for manual withdrawal."
+      - working: true
+        agent: "testing"
+        comment: "✅ WITHDRAWAL FIX VERIFIED! Comprehensive re-test of all 5 scenarios PASSED. (1) Reset test user: Successfully reset privy_id=wd_test_1 with real.balance=750, total_sol_deposited=1.0, total_sol_withdrawn_auto=0. (2) Auto-eligible withdrawal (0.5 SOL): Correctly converts to single manual record (auto=null, manual={kind:manual, status:pending, amount_sol:0.5}, auto_sol=0, manual_sol=0.5). Balance correctly deducted from $750 to $712.82 (0.5*$74.36 SOL price). NO balance refund. Exactly 1 withdrawal record (kind=manual, status=pending). NO auto_failed records. (3) Mixed withdrawal (1.4 SOL = 1 auto + 0.4 profit): Correctly creates single manual record (auto_sol=0, manual_sol=1.4). Balance correctly deducted by $104.10 (1.4*$74.36). Exactly 1 manual withdrawal record. (4) Admin reject refund: Successfully refunded $104.10 back to user's balance ($645.90 → $750.00). (5) Regression: GET /api/markets/prices returns all 7 pairs. FIX CONFIRMED: Lines 784-788 in server.py now correctly fold auto portion into manual_sol when treasury send fails, keeping balance deducted for pending manual withdrawal. No duplicate records created."
 
 frontend:
   - task: "Frontend UI"
@@ -483,17 +486,15 @@ frontend:
 
 metadata:
   created_by: "testing_agent"
-  version: "1.3"
-  test_sequence: 4
+  version: "1.4"
+  test_sequence: 5
   run_ui: false
 
 test_plan:
   current_focus:
-    - "CRITICAL: Fix auto-to-manual withdrawal fallback balance refund bug"
-    - "Admin endpoints tested and verified"
-    - "Auto-withdrawal system tested (fallback working, but has balance bug)"
-  stuck_tasks:
-    - "Auto-withdrawal fallback to manual (balance refund bug)"
+    - "Withdrawal fix verified and working correctly"
+    - "All backend endpoints tested and functional"
+  stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
@@ -506,3 +507,5 @@ agent_communication:
     message: "🎉 UPGRADED BACKEND COMPREHENSIVE TEST COMPLETE - ALL 14 TESTS PASSED! Tested major upgrade with dual account system (paper/real sub-accounts), custodial wallet auto-generation, competitions, and new endpoints. VERIFIED: (1) Root endpoint working, (2) User creation with custodial wallet (paper.balance=10000, real.balance=0, custodial_address generated, encrypted_privkey NOT returned, idempotent), (3) GET /users/me returns both sub-accounts, (4) Open position on PAPER account (balance deducted from paper only), (5) Open position on REAL account correctly rejected (insufficient balance), (6) Position listing filtered by account_type (paper/real isolation), (7) Close paper position (balance returned to paper only), (8) Leaderboards by account type (paper/real separate, legacy works), (9) Competitions endpoint (paper-main: 1 SOL entry, $10k pool; real-main: 10 SOL entry, $100k pool), (10) Join competition correctly validates real balance, (11) Withdraw request flow (validation working, withdrawals empty), (12) Force sweep (returns 0 as expected), (13) Competition leaderboard (empty as expected), (14) Regression tests (7 pairs, landing stats). Backend upgrade is FULLY FUNCTIONAL and ready for production."
   - agent: "testing"
     message: "🚨 ADMIN + AUTO-WITHDRAWAL ENDPOINTS TEST COMPLETE - CRITICAL BUG FOUND! Tested all 9 scenarios from review request. PASSED: (1) User setup with DB-faked deposits, (2) Admin endpoint guards (403 for non-admins), (3) Admin promotion via ADMIN_X_HANDLES env, (4) Admin overview/withdrawals/keystatus endpoints, (5) Admin approve (correctly fails with 503 when TREASURY_PRIVKEY empty), (6) Admin reject (correctly refunds user), (7) Insufficient balance rejection, (8) Regression (7 pairs, 2 competitions). CRITICAL BUG: Auto-to-manual withdrawal fallback incorrectly refunds balance. When TREASURY_PRIVKEY is empty and auto-eligible withdrawal fails, backend refunds the amount to user's balance (lines 783-789 in server.py) instead of keeping it reserved for the pending manual withdrawal. This allows users to withdraw funds without balance deduction. FIX REQUIRED: Remove the refund logic - balance should remain deducted for manual withdrawal. Also creates duplicate withdrawal records (auto_failed + manual) instead of just manual."
+  - agent: "testing"
+    message: "🎉 WITHDRAWAL FIX RE-TEST COMPLETE - ALL 5 TESTS PASSED! Verified the withdrawal fix is working correctly. Test results: (1) ✅ Reset test user (privy_id=wd_test_1, real.balance=750, total_sol_deposited=1.0, total_sol_withdrawn_auto=0), (2) ✅ Auto-eligible withdrawal (0.5 SOL) converts cleanly to single manual record with correct balance deduction ($750→$712.82, no refund, no auto_failed records), (3) ✅ Mixed withdrawal (1.4 SOL) creates single manual record with correct balance deduction ($750→$645.90), (4) ✅ Admin reject correctly refunds balance ($645.90→$750.00), (5) ✅ Regression test confirms GET /api/markets/prices returns 7 pairs. FIX VERIFIED: When TREASURY_PRIVKEY is empty and auto-eligible withdrawal fails, backend now correctly folds auto portion into manual_sol (lines 784-788) instead of refunding, keeping balance deducted for pending manual withdrawal. No duplicate withdrawal records created. Backend withdrawal system is FULLY FUNCTIONAL."

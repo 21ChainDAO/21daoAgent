@@ -758,39 +758,34 @@ async def withdraw_request(req: WithdrawRequestReq, x_privy_id: str = Header(...
     if auto_sol > 0:
         lamports = int(auto_sol * 1e9)
         sig = await send_sol_from_treasury(req.to_address, lamports)
-        wd_auto = {
-            "id": str(uuid.uuid4()),
-            "user_id": u["id"],
-            "privy_id": x_privy_id,
-            "x_handle": u.get("x_handle"),
-            "to_address": req.to_address,
-            "amount_sol": auto_sol,
-            "amount_usd": auto_sol * sol_price,
-            "sol_price_quote": sol_price,
-            "kind": "auto",
-            "status": "completed" if sig else "auto_failed",
-            "tx_signature": sig,
-            "requested_at": now(),
-            "processed_at": now() if sig else None,
-        }
-        await db.withdrawals.insert_one(wd_auto)
         if sig:
+            wd_auto = {
+                "id": str(uuid.uuid4()),
+                "user_id": u["id"],
+                "privy_id": x_privy_id,
+                "x_handle": u.get("x_handle"),
+                "to_address": req.to_address,
+                "amount_sol": auto_sol,
+                "amount_usd": auto_sol * sol_price,
+                "sol_price_quote": sol_price,
+                "kind": "auto",
+                "status": "completed",
+                "tx_signature": sig,
+                "requested_at": now(),
+                "processed_at": now(),
+            }
+            await db.withdrawals.insert_one(wd_auto)
             await db.users.update_one(
                 {"privy_id": x_privy_id},
                 {"$inc": {"total_sol_withdrawn_auto": auto_sol}},
             )
+            wd_auto.pop("_id", None)
+            out["auto"] = wd_auto
         else:
-            # treasury key missing or failed - refund the auto portion and flip to manual
-            await db.users.update_one(
-                {"privy_id": x_privy_id},
-                {"$inc": {"real.balance": auto_sol * sol_price}},
-            )
-            # turn this into manual
+            # treasury unavailable - fold the auto portion into the manual record
+            # balance stays deducted (reserved by the manual record)
             manual_sol += auto_sol
             auto_sol = 0
-            wd_auto.pop("_id", None)
-        wd_auto.pop("_id", None)
-        out["auto"] = wd_auto if auto_sol > 0 else None
 
     # MANUAL portion
     if manual_sol > 0:

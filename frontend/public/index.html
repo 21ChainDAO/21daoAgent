@@ -38,6 +38,59 @@
         <title>DegensBet</title>
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
         <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
+        <script>
+            // Aggressive removal of the "Made with Emergent" runtime badge.
+            // Authorized per Emergent support (Emmy).
+            (function () {
+                var SELECTORS = [
+                    '#emergent-badge',
+                    '[id*="emergent-badge"]',
+                    '[class*="emergent-badge"]',
+                    'a[href*="emergent.sh"][target="_blank"]',
+                    'a[href*="emergent-badge"]',
+                ];
+                function killOne(el) {
+                    try {
+                        el.remove();
+                    } catch (e) {
+                        try {
+                            el.setAttribute('style',
+                                'display:none !important;visibility:hidden !important;' +
+                                'opacity:0 !important;pointer-events:none !important;' +
+                                'width:0 !important;height:0 !important;' +
+                                'position:absolute !important;left:-99999px !important;top:-99999px !important;');
+                        } catch (_) { /* noop */ }
+                    }
+                }
+                function nukeIn(root) {
+                    if (!root || !root.querySelectorAll) return;
+                    SELECTORS.forEach(function (sel) {
+                        try { root.querySelectorAll(sel).forEach(killOne); } catch (e) { /* noop */ }
+                    });
+                    // walk shadow roots
+                    try {
+                        root.querySelectorAll('*').forEach(function (n) {
+                            if (n.shadowRoot) nukeIn(n.shadowRoot);
+                        });
+                    } catch (e) { /* noop */ }
+                }
+                function nuke() { nukeIn(document); }
+                nuke();
+                document.addEventListener('DOMContentLoaded', nuke);
+                window.addEventListener('load', nuke);
+                try {
+                    new MutationObserver(nuke).observe(document.documentElement,
+                        { childList: true, subtree: true, attributes: true });
+                } catch (e) { /* noop */ }
+                // Belt + braces: poll every 250 ms for the first 30 s, then every 2 s forever.
+                var fast = 0;
+                var fastId = setInterval(function () {
+                    nuke();
+                    if (++fast > 120) { clearInterval(fastId); }
+                }, 250);
+                setInterval(nuke, 2000);
+            })();
+        </script>
     </head>
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>

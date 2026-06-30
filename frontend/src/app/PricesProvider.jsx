@@ -1,15 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
 
 const Ctx = React.createContext({ prices: {}, get: () => null });
 export function usePrices() { return React.useContext(Ctx); }
 
-/**
- * Polls /api/markets/prices every 3 seconds (real DexScreener data via backend cache).
- * No synthetic noise — the displayed price always reflects the most recent upstream value.
- * Each tick updates `updated_at` so chart components can append a new point even
- * if the underlying price was unchanged.
- */
 const API_INTERVAL_MS = 3_000;
 
 export default function PricesProvider({ children }) {
@@ -29,12 +23,19 @@ export default function PricesProvider({ children }) {
         }
         lastRef.current = next;
         setPrices(next);
-      } catch (e) { /* noop */ }
+      } catch (err) {
+        console.warn('[prices] fetch failed:', err?.message || err);
+      }
     };
     load();
     const id = setInterval(load, API_INTERVAL_MS);
     return () => { alive = false; clearInterval(id); };
   }, []);
 
-  return <Ctx.Provider value={{ prices, get: (p) => prices[p] }}>{children}</Ctx.Provider>;
+  const value = useMemo(
+    () => ({ prices, get: (p) => prices[p] }),
+    [prices],
+  );
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

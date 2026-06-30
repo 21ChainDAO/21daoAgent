@@ -27,7 +27,7 @@ export default function WalletPage() {
     try {
       const r = await api.get(`/wallet/balance/${addr}`);
       setOnchain({ sol: r.data.sol || 0, usdc: r.data.usdc || 0 });
-    } catch (e) { /* noop */ }
+    } catch (e) { console.warn('[wallet] balance fetch failed:', e?.message || e); }
     finally { setLoadingBal(false); }
   }, [addr]);
 
@@ -35,14 +35,14 @@ export default function WalletPage() {
     try {
       const r = await api.get('/wallet/withdrawals/me');
       setWithdrawals(r.data.withdrawals || []);
-    } catch (e) { /* noop */ }
+    } catch (e) { console.warn('[wallet] withdrawals fetch failed:', e?.message || e); }
   };
 
   const loadBonus = async () => {
     try {
       const r = await api.get('/wallet/bonus_status');
       setBonus(r.data);
-    } catch (e) { /* noop */ }
+    } catch (e) { console.warn('[wallet] bonus status fetch failed:', e?.message || e); }
   };
 
   useEffect(() => {

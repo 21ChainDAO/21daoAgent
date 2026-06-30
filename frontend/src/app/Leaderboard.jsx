@@ -41,7 +41,7 @@ export default function Leaderboard() {
     load();
     const id = setInterval(load, 10000);
     return () => { alive = false; clearInterval(id); };
-  }, [tabId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tabId]);
 
   return (
     <div className="space-y-5">

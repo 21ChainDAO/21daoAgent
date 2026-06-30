@@ -25,14 +25,13 @@ export default function Dashboard() {
       const otherAcct = account === 'real' ? 'paper' : 'real';
       const oo = await api.get(`/positions/me?account_type=${otherAcct}&status=open`);
       setOtherOpenPos(oo.data.positions);
-    } catch (e) { /* noop */ }
+    } catch (e) { console.warn('[dashboard] positions fetch failed:', e?.message || e); }
   };
 
   useEffect(() => {
     loadPositions();
     const id = setInterval(loadPositions, 6000);
     return () => clearInterval(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account]);
 
   if (!dbUser) return <div className="font-pixel text-[#808080] text-[10px]">LOADING...</div>;

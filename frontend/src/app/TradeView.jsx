@@ -53,7 +53,7 @@ export default function TradeView() {
         if (!alive) return;
         const candles = (r.data?.candles || []).map(c => ({ t: c.t * 1000, p: c.c }));
         setHistory(candles);
-      } catch (e) { /* noop */ }
+      } catch (e) { console.warn('[trade] candles fetch failed:', e?.message || e); }
     };
     fetchCandles();
   }, [pair]);
@@ -80,7 +80,6 @@ export default function TradeView() {
     loadPositions();
     const id = setInterval(loadPositions, 5000);
     return () => clearInterval(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account]);
 
   const openTrade = async () => {

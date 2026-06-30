@@ -122,14 +122,14 @@ export default function TradingPreview() {
                   <div className="col-span-12 md:col-span-4 bg-[#0d0d0d] border border-[#1f1f1f] p-2">
                     <div className="font-pixel text-[8px] text-[#808080] mb-2">ORDER BOOK</div>
                     <div className="space-y-[2px]">
-                      {orderBookAsks.map((a,i)=>(
-                        <div key={i} className="flex justify-between font-mono text-[14px] text-[#ff3838]">
+                      {orderBookAsks.map((a) => (
+                        <div key={`ask-${a.p}`} className="flex justify-between font-mono text-[14px] text-[#ff3838]">
                           <span>{a.p}</span><span>{a.s}</span>
                         </div>
                       ))}
                       <div className="font-mono text-[16px] text-white text-center my-1">67,420.18</div>
-                      {orderBookBids.map((b,i)=>(
-                        <div key={i} className="flex justify-between font-mono text-[14px] text-[#00FF29]">
+                      {orderBookBids.map((b) => (
+                        <div key={`bid-${b.p}`} className="flex justify-between font-mono text-[14px] text-[#00FF29]">
                           <span>{b.p}</span><span>{b.s}</span>
                         </div>
                       ))}
@@ -141,7 +141,7 @@ export default function TradingPreview() {
                 <div className="mt-3 bg-[#0d0d0d] border border-[#1f1f1f] p-2 overflow-hidden">
                   <div className="marquee font-pixel text-[9px]">
                     {[...markets, ...markets].map((m, i) => (
-                      <span key={i} className="flex items-center gap-2">
+                      <span key={`${m.sym}-${i < markets.length ? 'a' : 'b'}`} className="flex items-center gap-2">
                         <span className="text-white">{m.sym}</span>
                         <span className="text-[#808080]">{m.price}</span>
                         <span className={m.up ? 'text-[#00FF29]' : 'text-[#ff3838]'}>

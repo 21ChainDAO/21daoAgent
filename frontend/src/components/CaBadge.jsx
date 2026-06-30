@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 import { copyText } from '../lib/clipboard';
 
-// Live $DEGEN contract address (Solana).
-const DEGEN_CA = 'BkEqYRg7CqHwuEeUk1eyvAurcaUMzT9R1Xi3ZByspump';
+// Pre-launch placeholder until $DEGEN mints. Update this constant once the real CA exists.
+const DEGEN_CA = 'db...pump';
 
 /**
  * Fixed bottom-right pixel-card showing the $DEGEN contract address.
@@ -25,9 +25,11 @@ export default function CaBadge() {
     }
   };
 
-  const short = isLive
-    ? `${DEGEN_CA.slice(0, 4)}...${DEGEN_CA.slice(-4)}`
-    : 'TBA';
+  const short = !isLive
+    ? 'TBA'
+    : (DEGEN_CA.length <= 12
+        ? DEGEN_CA
+        : `${DEGEN_CA.slice(0, 4)}...${DEGEN_CA.slice(-4)}`);
 
   return (
     <button

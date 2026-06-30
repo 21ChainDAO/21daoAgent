@@ -1123,7 +1123,7 @@ async def token_info():
     return {
         "symbol": "DEGEN",
         "name": "Degens Token",
-        "contract": os.environ.get("DEGEN_CONTRACT") or os.environ.get("DBET_CONTRACT") or "BkEqYRg7CqHwuEeUk1eyvAurcaUMzT9R1Xi3ZByspump",
+        "contract": os.environ.get("DEGEN_CONTRACT") or os.environ.get("DBET_CONTRACT") or "db...pump",
         "chain": "Solana",
         "total_supply": 1_000_000_000,
         "tokenomics": [

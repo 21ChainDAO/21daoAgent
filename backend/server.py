@@ -1121,9 +1121,9 @@ async def cancel_withdrawal(wid: str, x_privy_id: str = Header(...)):
 @api.get("/token")
 async def token_info():
     return {
-        "symbol": "DEGEN",
-        "name": "Degens Token",
-        "contract": os.environ.get("DEGEN_CONTRACT") or os.environ.get("DBET_CONTRACT") or "db...pump",
+        "symbol": "dBET",
+        "name": "DegensBet Token",
+        "contract": os.environ.get("DEGEN_CONTRACT") or os.environ.get("DBET_CONTRACT") or "TBA",
         "chain": "Solana",
         "total_supply": 1_000_000_000,
         "tokenomics": [

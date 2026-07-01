@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 import { copyText } from '../lib/clipboard';
 
-// Pre-launch placeholder until $DEGEN mints. Update this constant once the real CA exists.
-const DEGEN_CA = 'db...pump';
+// Pre-launch placeholder — swap this when $dBET mints.
+const DEGEN_CA = 'TBA';
 
 /**
  * Fixed bottom-right pixel-card showing the $DEGEN contract address.
@@ -35,7 +35,7 @@ export default function CaBadge() {
     <button
       data-testid="ca-badge"
       onClick={handleCopy}
-      title={isLive ? `Copy $DEGEN contract: ${DEGEN_CA}` : '$DEGEN contract address coming soon'}
+      title={isLive ? `Copy $dBET contract: ${DEGEN_CA}` : '$dBET contract address coming soon'}
       style={{
         position: 'fixed',
         bottom: 16,
@@ -58,7 +58,7 @@ export default function CaBadge() {
       onMouseEnter={(e) => { e.currentTarget.style.transform = 'translate(-1px,-1px)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
     >
-      <span style={{ fontSize: 7, color: '#00FF29', letterSpacing: 1 }}>$DEGEN</span>
+      <span style={{ fontSize: 7, color: '#00FF29', letterSpacing: 1 }}>$dBET</span>
       <span style={{
         fontFamily: 'monospace',
         fontSize: 11,

@@ -94,7 +94,7 @@ function CompCard({ comp, board, onJoin, busy, realBalance }) {
           <div className="font-pixel text-[7px] text-[#808080]">PRIZE POOL</div>
           <div className="font-pixel text-[18px] glow-green">{fmtUsd(comp.prize_pool_usd)}</div>
           {comp.prize_pool_degen && (
-            <div className="font-pixel text-[10px] text-[#ffe93d] mt-1">+ {formatDegen(comp.prize_pool_degen)} DEGEN</div>
+            <div className="font-pixel text-[10px] text-[#ffe93d] mt-1">+ {formatDegen(comp.prize_pool_degen)} dBET</div>
           )}
         </div>
         <div className="bg-[#0d0d0d] border border-[#1f1f1f] p-3">
@@ -117,7 +117,7 @@ function CompCard({ comp, board, onJoin, busy, realBalance }) {
                 </span>
                 {(p.degen || p.degen_each) && (
                   <span className="text-[#ffe93d] ml-2">
-                    + {formatDegen(p.degen_each || p.degen)} DEGEN{p.degen_each ? ' ea' : ''}
+                    + {formatDegen(p.degen_each || p.degen)} dBET{p.degen_each ? ' ea' : ''}
                   </span>
                 )}
               </span>

@@ -10,7 +10,7 @@ const cols = [
     { label: 'Launch App', to: '/app' },
   ]},
   { title: 'TOKEN', links: [
-    { label: '$DEGEN', to: '/#token', external: false },
+    { label: '$dBET', to: '/#token', external: false },
     { label: 'Tokenomics', to: '/#token', external: false },
   ]},
   { title: 'RESOURCES', links: [

@@ -36,13 +36,13 @@ export default function Terms() {
       </ul>
 
       <h2>7. COMPETITIONS</h2>
-      <p>Entry fees are non-refundable and are paid from your REAL balance. Prize structures, schedules, and pool sizes may be modified at the Service&rsquo;s discretion. Winners are announced after the operator verifies eligibility; the Service reserves the right to disqualify any participant for breach of these Terms. Prizes paid in <code>$DEGEN</code> are subject to the tokenomics published on the homepage.</p>
+      <p>Entry fees are non-refundable and are paid from your REAL balance. Prize structures, schedules, and pool sizes may be modified at the Service&rsquo;s discretion. Winners are announced after the operator verifies eligibility; the Service reserves the right to disqualify any participant for breach of these Terms. Prizes paid in <code>$dBET</code> are subject to the tokenomics published on the homepage.</p>
 
       <h2>8. NO INVESTMENT ADVICE</h2>
       <p>Nothing on the Service constitutes investment, legal, accounting, or tax advice. Past performance is not indicative of future results. You acknowledge that trading on leverage carries substantial risk of loss.</p>
 
       <h2>9. INTELLECTUAL PROPERTY</h2>
-      <p>All Service content, branding (including DegensBet and $DEGEN), code, and design are property of the operator. You receive a limited, non-exclusive, non-transferable license to use the Service for personal, non-commercial purposes.</p>
+      <p>All Service content, branding (including DegensBet and $dBET), code, and design are property of the operator. You receive a limited, non-exclusive, non-transferable license to use the Service for personal, non-commercial purposes.</p>
 
       <h2>10. DISCLAIMERS &amp; LIMITATION OF LIABILITY</h2>
       <p>The Service is provided &ldquo;AS IS&rdquo; without warranties of any kind. To the maximum extent permitted by law, the operator shall not be liable for any indirect, consequential, special, or punitive damages, or for any loss of profits or data, arising out of your use of the Service. Aggregate liability shall not exceed the amount of fees paid to the operator by you in the preceding 30 days.</p>

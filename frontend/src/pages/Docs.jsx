@@ -6,7 +6,7 @@ export default function Docs() {
     <StaticPage title="HOW IT WORKS" kicker="// DOCS.SYS">
       <p>
         DegensBet is a competitive trading arcade. Connect with X, get a deposit address, fund it, and battle
-        other degens for cash and <code>$DEGEN</code> token prizes. Two arenas: <strong>PAPER</strong> (sandbox) and
+        other degens for cash and <code>$dBET</code> token prizes. Two arenas: <strong>PAPER</strong> (sandbox) and
         <strong> REAL</strong> (skin in the game).
       </p>
 
@@ -42,12 +42,12 @@ export default function Docs() {
       <h2>6. COMPETITIONS</h2>
       <p>Two flagship tournaments running continuously:</p>
       <ul>
-        <li><strong>PAPER ARCADE</strong> &mdash; entry: 0.25 SOL &bull; prize pool: $10,000 + 30,000,000 DEGEN.</li>
-        <li><strong>REAL MONEY ARENA</strong> &mdash; entry: 2.5 SOL &bull; prize pool: $100,000 + 70,000,000 DEGEN.</li>
+        <li><strong>PAPER ARCADE</strong> &mdash; entry: 0.25 SOL &bull; prize pool: $10,000 + 30,000,000 dBET.</li>
+        <li><strong>REAL MONEY ARENA</strong> &mdash; entry: 2.5 SOL &bull; prize pool: $100,000 + 70,000,000 dBET.</li>
       </ul>
-      <p>Ranking is by <strong>tournament PnL</strong> (your PnL accrued since joining). Entry fees fund the operating treasury and DEGEN incentives.</p>
+      <p>Ranking is by <strong>tournament PnL</strong> (your PnL accrued since joining). Entry fees fund the operating treasury and dBET incentives.</p>
 
-      <h2>7. $DEGEN TOKEN</h2>
+      <h2>7. $dBET TOKEN</h2>
       <p>1,000,000,000 supply on Solana. Distribution:</p>
       <ul>
         <li>50% Locked</li>
@@ -55,7 +55,7 @@ export default function Docs() {
         <li>3% Paper-arena prize pool</li>
         <li>40% Public fair launch</li>
       </ul>
-      <p>Contract address: <code>db...pump</code> &mdash; full mint will be published in the token section on the homepage at launch, and pinned permanently in the bottom-right of every page.</p>
+      <p>Contract address: <code>TBA</code> &mdash; will be published in the token section on the homepage at launch, and pinned permanently in the bottom-right of every page.</p>
 
       <h2>8. RISK</h2>
       <p>Trading with leverage is risky. PnL is calculated on real market prices, but liquidity for execution is provided by the platform; you are entering a wager-style instrument against the house, not the open market. Do not deposit more than you are willing to lose. See <a href="/terms">Terms</a> and <a href="/privacy">Privacy</a>.</p>

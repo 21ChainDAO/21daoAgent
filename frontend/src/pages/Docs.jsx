@@ -50,10 +50,13 @@ export default function Docs() {
       <h2>7. $dBET TOKEN</h2>
       <p>1,000,000,000 supply on Solana. Distribution:</p>
       <ul>
-        <li>50% Locked</li>
-        <li>7% Real-arena prize pool</li>
-        <li>3% Paper-arena prize pool</li>
-        <li>40% Public fair launch</li>
+        <li>10% Vested
+          <ul>
+            <li>7% Real-arena prize pool</li>
+            <li>3% Paper-arena prize pool</li>
+          </ul>
+        </li>
+        <li>90% Public fair launch</li>
       </ul>
       <p>Contract address: <code>TBA</code> &mdash; will be published in the token section on the homepage at launch, and pinned permanently in the bottom-right of every page.</p>
 

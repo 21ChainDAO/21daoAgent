@@ -69,7 +69,7 @@ export default function TokenSection() {
         </div>
 
         {/* Tokenomics grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
           {info.tokenomics.map(t => {
             const Icon = ICONS[t.label] || Coins;
             return (
@@ -82,6 +82,16 @@ export default function TokenSection() {
                 <div className="font-pixel text-[22px]" style={{ color: t.color }}>{t.pct}%</div>
                 <div className="font-pixel text-[9px] text-white mt-2">{t.label}</div>
                 <div className="font-mono text-[14px] text-[#808080] mt-2">{formatN(t.amount)} dBET</div>
+                {t.sub && t.sub.length > 0 && (
+                  <div className="border-t border-[#1f1f1f] mt-3 pt-3 space-y-1">
+                    {t.sub.map(s => (
+                      <div key={s.label} className="flex items-center justify-between font-pixel text-[8px] text-[#808080]">
+                        <span>{s.label}</span>
+                        <span style={{ color: t.color }}>{s.pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}

@@ -1127,10 +1127,12 @@ async def token_info():
         "chain": "Solana",
         "total_supply": 1_000_000_000,
         "tokenomics": [
-            {"label": "LOCKED",          "pct": 50, "amount": 500_000_000, "color": "#ff3838"},
-            {"label": "REAL REWARDS",    "pct": 7,  "amount":  70_000_000, "color": "#00FF29"},
-            {"label": "PAPER REWARDS",   "pct": 3,  "amount":  30_000_000, "color": "#13b84d"},
-            {"label": "PUBLIC LAUNCH",   "pct": 40, "amount": 400_000_000, "color": "#F5F5F5"},
+            {"label": "VESTED", "pct": 10, "amount": 100_000_000, "color": "#00FF29",
+             "sub": [
+                {"label": "REAL REWARDS",  "pct": 7, "amount": 70_000_000},
+                {"label": "PAPER REWARDS", "pct": 3, "amount": 30_000_000},
+             ]},
+            {"label": "PUBLIC LAUNCH", "pct": 90, "amount": 900_000_000, "color": "#F5F5F5"},
         ],
     }
 

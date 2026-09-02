@@ -1,0 +1,28 @@
+{
+    "$schema": "https://turbo.build/schema.json",
+    "remoteCache": {
+        "signature": true
+    },
+    "tasks": {
+        "build": {
+            "dependsOn": ["^build"],
+            "outputs": ["dist/**", "lib/**"]
+        },
+        "build:program": {
+            "dependsOn": ["^build:program"]
+        },
+        "clean": {},
+        "lint:fix": {
+            "inputs": ["tsconfig*.json", "src/**", "test/**"],
+            "outputs": []
+        },
+        "lint": {
+            "inputs": ["tsconfig*.json", "src/**", "test/**"],
+            "outputs": []
+        },
+        "test": {
+            "inputs": ["src/**", "test/**"],
+            "outputs": []
+        }
+    }
+}

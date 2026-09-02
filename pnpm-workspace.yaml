@@ -1,0 +1,11 @@
+packages:
+  - "account-compression/sdk"
+  - "libraries/type-length-value/js"
+  - "name-service/js"
+  - "single-pool/js/packages/*"
+  - "stake-pool/js"
+  - "token/js"
+  - "token-group/js"
+  - "token-lending/js"
+  - "token-metadata/js"
+  - "token-swap/js"

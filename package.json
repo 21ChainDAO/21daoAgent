@@ -1,0 +1,32 @@
+{
+    "private": true,
+    "workspaces": [
+        "account-compression/sdk",
+        "token-lending/js",
+        "token-swap/js"
+    ],
+    "scripts": {
+        "build": "turbo run build",
+        "build:program": "turbo run build:program",
+        "clean": "turbo run clean",
+        "lint": "turbo run lint",
+        "format": "prettier --check .",
+        "format:fix": "prettier --write .",
+        "test": "turbo run test"
+    },
+    "devDependencies": {
+        "@solana/eslint-config-solana": "^4.0.0",
+        "@solana/prettier-config-solana": "^0.0.5",
+        "eslint-config-prettier": "^9.1.0",
+        "eslint-config-turbo": "^2.3.3",
+        "eslint-plugin-prettier": "^5.2.1",
+        "prettier": "^3.4.2",
+        "turbo": "^2.3.3"
+    },
+    "engines": {
+        "node": ">=14.0.0"
+    },
+    "packageManager": "pnpm@8.14.3",
+    "prettier": "@solana/prettier-config-solana",
+    "name": "solana-program-library"
+}

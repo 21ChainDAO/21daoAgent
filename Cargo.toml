@@ -1,0 +1,66 @@
+[profile.dev]
+split-debuginfo = "unpacked"
+
+# The curve25519-dalek crate uses the `simd` backend by default in v4 if
+# possible, which has very slow performance on some platforms with opt-level 0,
+# which is the default for `dev` and `test` builds. This slowdown causes
+# certain interactions in the solana-test-validator, such as verifying ZK
+# proofs in transactions, to take much more than 400ms, creating problems in
+# the test environment. To give better performance in the solana-test-validator
+# during tests and dev builds, override the opt-level to 3 for the crate.
+[profile.dev.package.curve25519-dalek]
+opt-level = 3
+
+[workspace]
+members = [
+  "binary-option/program",
+  "binary-oracle-pair/program",
+  "examples/rust/cross-program-invocation",
+  "examples/rust/custom-heap",
+  "examples/rust/logging",
+  "examples/rust/sysvar",
+  "examples/rust/transfer-lamports",
+  "examples/rust/transfer-tokens",
+  "governance/addin-mock/program",
+  "governance/addin-api",
+  "governance/program",
+  "governance/test-sdk",
+  "governance/tools",
+  "governance/chat/program",
+  "libraries/concurrent-merkle-tree",
+  "libraries/math",
+  "libraries/math-example",
+  "libraries/merkle-tree-reference",
+  "name-service/program",
+  "managed-token/program",
+  "shared-memory/program",
+  "stateless-asks/program",
+  #"token-collection/program",
+  "token-lending/cli",
+  "token-lending/flash_loan_receiver",
+  "token-lending/program",
+  "token-swap/program",
+  "token-swap/program/fuzz",
+  "token-upgrade/cli",
+  "token-upgrade/program",
+  "token-wrap/program",
+  "utils/cgen",
+  "utils/test-client",
+]
+
+exclude = [
+]
+
+resolver = "2"
+
+[workspace.lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = [
+    'cfg(target_os, values("solana"))',
+    'cfg(feature, values("frozen-abi", "no-entrypoint"))',
+]
+
+[workspace.metadata.release]
+pre-release-commit-message = "Publish {{crate_name}} v{{version}}"
+tag-message = "Publish {{crate_name}} v{{version}}"
+consolidate-commits = false

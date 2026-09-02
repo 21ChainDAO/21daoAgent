@@ -1,42 +1,52 @@
 # 21Agent
 
-**The onchain coding agent by 21DAO.**
+**The coding agent for Robinhood Chain.**
 
-21Agent is an open-source coding agent built for developers working across Solana and the onchain ecosystem.
+21Agent is an open-source coding agent built by **21DAO** for developers building on Robinhood Chain.
 
-It combines an AI-native terminal workflow with repository awareness, blockchain tooling, transaction inspection, program analysis, and extensible developer skills.
+It brings repository-aware AI, EVM tooling, contract interaction, transaction debugging and Robinhood Chain context directly into the terminal.
 
-Built by **21DAO** — chain-agnostic hackers building infrastructure for the onchain world.
+Minimal core. Onchain primitives. Extend everything.
 
 ---
 
-## What is 21Agent?
+## Why 21Agent?
 
-21Agent is a coding environment designed around a simple idea:
+AI coding agents understand your code.
 
-**Your coding agent should understand the chain you're building on.**
+They don't understand enough about where that code eventually executes.
 
-Traditional coding agents understand files, repositories, terminals, and development environments.
+For onchain developers, the development environment extends beyond the repository:
 
-21Agent extends that model into the onchain world.
+```text
+Repository
+    ↓
+Contracts
+    ↓
+Compiler
+    ↓
+RPC
+    ↓
+Transactions
+    ↓
+Chain State
+    ↓
+Explorer
+```
 
-It can work with:
+21Agent brings these layers into the agent's development environment.
 
-* source code
-* Git repositories
-* terminal commands
-* Solana programs
-* RPC endpoints
-* transactions
-* accounts
-* instructions
-* IDLs
-* Anchor projects
-* wallets
-* program logs
-* deployment workflows
+Instead of treating the blockchain as an external service, 21Agent treats **Robinhood Chain as part of the coding context.**
 
-Instead of switching between your coding agent, explorer, RPC console, CLI, documentation, and debugging tools, 21Agent brings those workflows into one programmable environment.
+Ask it to write code.
+
+Ask it to inspect a contract.
+
+Ask it why a transaction reverted.
+
+Ask it what's deployed at an address.
+
+Ask it to build the tooling it doesn't have yet.
 
 ---
 
@@ -46,114 +56,112 @@ Instead of switching between your coding agent, explorer, RPC console, CLI, docu
 npm install -g @21dao/21agent
 ```
 
-Start 21Agent inside your project:
+Enter your project:
 
 ```bash
 cd my-project
 21agent
 ```
 
-Then talk to it.
+Then start building.
 
 ```text
 > explain this repository
 
-> find the bug in this program
+> inspect the contracts
 
-> inspect the Anchor instructions
+> compile the project
 
-> analyze this Solana transaction
+> review this contract before deployment
 
-> explain why this transaction failed
+> deploy this to Robinhood Chain testnet
 
-> generate tests for this program
+> inspect 0x...
 
-> inspect the accounts touched by this instruction
+> explain why this transaction reverted
 
-> review this program before deployment
+> generate tests for this contract
+
+> show me every function capable of moving funds
 ```
 
 ---
 
-## Solana Native
+## Robinhood Chain Native
 
-Solana is the first deeply integrated network in 21Agent.
+Robinhood Chain support is built directly into the 21Agent development workflow.
 
-21Agent understands common Solana development primitives and can expose them directly to the model.
+21Agent can reason across both your local repository and onchain state.
 
 ```text
-Repository
-    │
-    ├── Source
-    ├── Anchor
-    ├── IDL
-    └── Tests
-         │
-         ▼
-     21Agent
-         │
-    ┌────┼──────────┐
-    │    │          │
-   RPC  Programs  Transactions
-    │    │          │
-    └────┼──────────┘
-         ▼
-       Solana
+                    21Agent
+                       │
+          ┌────────────┴────────────┐
+          │                         │
+     Local Context             Chain Context
+          │                         │
+    ┌─────┼─────┐            ┌──────┼──────┐
+    │     │     │            │      │      │
+  Code   Git   Tests         RPC   State   TXs
+    │     │     │            │      │      │
+    └─────┴─────┘            └──────┴──────┘
+          │                         │
+          └────────────┬────────────┘
+                       │
+                 Robinhood Chain
 ```
 
-Use 21Agent to inspect programs, reason about instructions, decode transactions, analyze accounts, simulate execution, and debug onchain behavior without leaving your development workflow.
+The agent can use chain-aware tools while working through development tasks instead of requiring the developer to constantly move between terminals, explorers, RPC dashboards and documentation.
 
 ---
 
 ## Repository Aware
 
-21Agent operates inside your repository.
-
-It can inspect:
+Start 21Agent from inside a repository and it builds context around the project.
 
 ```text
+contracts/
 src/
-programs/
-tests/
-scripts/
-migrations/
+script/
+test/
+lib/
 package.json
-Anchor.toml
-Cargo.toml
+foundry.toml
+hardhat.config.ts
 .git/
 ```
 
-This gives the model context about what you're actually building before it starts changing code.
-
-Reference files directly:
+Reference individual files:
 
 ```text
-@programs/vault/src/lib.rs
+@contracts/Vault.sol
 
-@Anchor.toml
+@test/Vault.t.sol
 
-@tests/vault.ts
+@script/Deploy.s.sol
 ```
 
-Or ask questions across the entire project:
+Or let 21Agent reason across the project.
 
 ```text
-> map this codebase
+> map the architecture of this protocol
 
-> explain how funds move through this protocol
+> explain how assets move through these contracts
 
-> find every instruction that can modify authority
+> identify privileged functions
 
-> review the repository for unsafe account validation
+> find every external call
+
+> review the upgrade mechanism
+
+> find potential reentrancy issues
 ```
 
 ---
 
-## Tools
+## Robinhood Chain Tools
 
-21Agent exposes development capabilities as tools.
-
-Core tools include:
+21Agent exposes onchain functionality to the coding agent as tools.
 
 ```text
 read
@@ -163,80 +171,205 @@ bash
 grep
 find
 git
+
 rpc
-solana
+contract
+call
 simulate
-inspect
+transaction
+logs
+deploy
+verify
 ```
 
-The agent decides when and how to use them while working through a task.
+This allows a single agent session to move between code and chain state.
 
-Additional capabilities can be installed or implemented without changing the core agent.
+For example:
+
+```text
+> debug this transaction
+```
+
+21Agent can inspect the transaction, decode calldata, inspect the target contract, analyze logs and revert data, correlate the result with your local source code and suggest a fix.
+
+---
+
+## Contract Intelligence
+
+21Agent can inspect deployed contracts directly.
+
+```text
+> inspect 0x742...
+```
+
+The agent can reason about:
+
+```text
+bytecode
+ABI
+functions
+events
+storage
+proxy patterns
+permissions
+transaction history
+contract interactions
+```
+
+Combine that information with local repository context:
+
+```text
+> compare the deployed contract with the version in ./contracts
+```
+
+or:
+
+```text
+> determine whether this deployment matches the current build
+```
+
+---
+
+## Transaction Debugging
+
+Onchain failures shouldn't require jumping through five different tools.
+
+Give 21Agent a transaction:
+
+```text
+> debug 0x8ac...
+```
+
+21Agent can inspect:
+
+```text
+transaction
+    │
+    ├── sender
+    ├── receiver
+    ├── calldata
+    ├── value
+    ├── receipt
+    ├── logs
+    ├── execution
+    └── revert data
+```
+
+Then connect the execution back to the relevant source code.
+
+---
+
+## EVM Development
+
+21Agent is compatible with standard EVM development workflows.
+
+Use it alongside tools such as:
+
+```text
+Foundry
+Hardhat
+Solidity
+viem
+ethers
+Node.js
+TypeScript
+```
+
+21Agent doesn't replace the EVM developer stack.
+
+It gives an agent the ability to operate it.
 
 ---
 
 ## Skills
 
-Skills provide reusable onchain workflows.
+21Agent capabilities can be extended through reusable skills.
 
 ```text
 skills/
-├── anchor-review/
-├── program-inspector/
+├── contract-review/
 ├── transaction-debugger/
+├── deployment-review/
 ├── repo-analysis/
-├── account-inspector/
+├── proxy-inspector/
+├── token-analysis/
 ├── security-review/
-├── deployment-check/
-└── protocol-research/
+└── robinhood-chain/
 ```
 
+Skills provide specialized instructions and workflows without bloating the core agent.
+
 Example:
+
+```text
+/skill:contract-review
+```
+
+or:
 
 ```text
 /skill:transaction-debugger
 ```
 
-21Agent can then inspect the transaction, retrieve execution information, analyze program logs, identify relevant instructions, and explain likely failure conditions.
-
-Developers can build and distribute their own skills.
+Developers can create their own skills and share them with others.
 
 ---
 
-## Sessions
+## Extensions
 
-Development sessions can be persisted locally.
+21Agent is designed to be modified.
 
-A session records the interaction between the developer, model, repository, and tools.
+Need another tool?
 
-```text
-Developer Prompt
-      │
-      ▼
-Agent Reasoning
-      │
-      ▼
-Tool Call
-      │
-      ▼
-Tool Result
-      │
-      ▼
-Code / Chain Interaction
-      │
-      ▼
-Agent Response
+Build it.
+
+Need another RPC integration?
+
+Add it.
+
+Need a custom deployment workflow?
+
+Extend it.
+
+```ts
+export default function (agent: ExtensionAPI) {
+  agent.registerTool({
+    name: "robinhood_contract",
+    // implementation
+  });
+
+  agent.registerCommand("deploy-rh", {
+    // implementation
+  });
+}
 ```
 
-Sessions make complex development workflows easier to continue, inspect, reproduce, and debug.
+Extensions can add:
+
+```text
+custom tools
+commands
+RPC providers
+wallet integrations
+contract tooling
+deployment systems
+security scanners
+sub-agents
+permission systems
+custom UI
+Git workflows
+additional chains
+```
+
+The harness adapts to the developer.
+
+Not the other way around.
 
 ---
 
 ## Multiple Models
 
-21Agent is designed to remain model-agnostic.
-
-Use the model that fits your workflow.
+21Agent isn't tied to one model provider.
 
 ```bash
 21agent --provider anthropic
@@ -244,109 +377,39 @@ Use the model that fits your workflow.
 21agent --provider google
 ```
 
-Model providers and available models can be configured independently from the core runtime.
+Switch models based on the task, cost or workflow.
 
-21DAO does not believe your development environment should be permanently tied to a single model provider.
+The agent layer and blockchain layer remain independent.
 
 ---
 
-## Interactive Mode
+## Sessions
 
-Run:
-
-```bash
-21agent
-```
-
-to launch the interactive terminal environment.
-
-From there you can work with the agent like another developer sitting inside your repository.
+21Agent keeps development work organized into sessions.
 
 ```text
-21agent >
-
-> inspect programs/token-vault
-
-Reading program...
-
-> identify the authority model
-
-Analyzing instructions and account constraints...
-
-> now check whether any instruction can bypass it
-
-Searching program instructions...
+Developer
+    │
+    ▼
+Prompt
+    │
+    ▼
+21Agent
+    │
+    ├── Read repository
+    ├── Execute tools
+    ├── Query chain
+    ├── Modify code
+    ├── Run tests
+    └── Inspect results
+    │
+    ▼
+Result
 ```
 
-The agent can read files, modify code, execute commands, inspect repository state, and invoke onchain development tools.
+Sessions can preserve tool calls, results, development context and agent interactions.
 
----
-
-## CLI
-
-```bash
-21agent [options] [@files...] [prompt]
-```
-
-Examples:
-
-```bash
-21agent "Explain this repository"
-```
-
-```bash
-21agent @programs/vault/src/lib.rs "Review this program"
-```
-
-```bash
-21agent -p "Find potential security issues"
-```
-
-```bash
-21agent --model claude "Refactor this instruction"
-```
-
-```bash
-21agent --tools read,grep,find "Perform a read-only review"
-```
-
----
-
-## Extensions
-
-21Agent is designed to be hacked.
-
-Extensions can add:
-
-* custom tools
-* custom commands
-* Solana integrations
-* protocol integrations
-* RPC providers
-* security scanners
-* deployment systems
-* wallet interfaces
-* sub-agents
-* custom UI
-* Git workflows
-* sandbox environments
-
-Example:
-
-```ts
-export default function (agent: ExtensionAPI) {
-  agent.registerTool({
-    name: "inspect_transaction",
-    // ...
-  });
-
-  agent.registerCommand("audit", {
-    // ...
-  });
-}
-```
-
-If your workflow needs something 21Agent doesn't have, build it.
+This makes complex debugging and development workflows easier to inspect and continue.
 
 ---
 
@@ -361,21 +424,21 @@ If your workflow needs something 21Agent doesn't have, build it.
 │   ├── runtime/
 │   ├── cli/
 │   ├── tui/
-│   ├── github/
-│   ├── solana/
+│   ├── evm/
+│   ├── robinhood/
 │   ├── rpc/
-│   ├── wallet/
+│   ├── contracts/
 │   └── tools/
 │
 ├── skills/
-│   ├── anchor-review/
-│   ├── program-inspector/
+│   ├── robinhood-chain/
+│   ├── contract-review/
 │   ├── transaction-debugger/
-│   ├── account-inspector/
+│   ├── deployment-review/
 │   └── security-review/
 │
 ├── extensions/
-│   ├── solana/
+│   ├── robinhood/
 │   ├── github/
 │   └── providers/
 │
@@ -385,71 +448,61 @@ If your workflow needs something 21Agent doesn't have, build it.
 └── tests/
 ```
 
-The core stays small.
-
-Everything else is composable.
-
 ---
 
-## Chain Agnostic
+## Primitives, Not Features
 
-21Agent starts with Solana.
+21Agent intentionally keeps the core small.
 
-It does not end with Solana.
-
-Blockchain-specific functionality is implemented through adapters and extensions rather than being permanently embedded into the core runtime.
+Instead of trying to predict every workflow an onchain developer might need, it exposes primitives developers can compose themselves.
 
 ```text
-                 21Agent
-                    │
-          ┌─────────┼─────────┐
-          │         │         │
-       Solana      EVM      Other
-          │         │         │
-       Adapter    Adapter    Adapter
+Agent
++
+Tools
++
+Skills
++
+Extensions
++
+Chain Context
 ```
 
-The long-term goal is a common agent interface for building software across onchain environments.
+That's the system.
+
+Everything else can be built on top.
 
 ---
 
-## Philosophy
+## Beyond Robinhood Chain
 
-21Agent is built around four principles.
+21Agent is developed around Robinhood Chain, but the architecture is chain-agnostic.
 
-### Minimal Core
+```text
+                   21Agent
+                      │
+             ┌────────┴────────┐
+             │                 │
+      Robinhood Chain       Adapters
+             │                 │
+            EVM          Other Networks
+```
 
-Keep the agent runtime small and understandable.
+Robinhood Chain is where we're starting.
 
-### Onchain Native
-
-Blockchains should be first-class development environments, not external APIs bolted onto an AI coding tool.
-
-### Extensible
-
-Developers should be able to modify the agent around their workflow instead of modifying their workflow around the agent.
-
-### Chain Agnostic
-
-Networks change.
-
-Models change.
-
-Developer tooling changes.
-
-The core should survive all three.
+The agent runtime doesn't need to stop there.
 
 ---
 
 ## Built by 21DAO
 
-21DAO is a chain-agnostic collective of onchain hackers, developers, and researchers.
+21DAO is a chain-agnostic collective of hackers and developers building experimental onchain infrastructure.
 
-We build experimental infrastructure at the intersection of crypto, AI, and open-source software.
+21Agent started from a simple question:
 
-21Agent is our coding agent for that world.
+**What would a coding agent look like if the blockchain itself was part of its development environment?**
 
-**Hack locally. Ship onchain.**
+Robinhood Chain is our first implementation of that idea.
 
 ---
 
@@ -457,26 +510,27 @@ We build experimental infrastructure at the intersection of crypto, AI, and open
 
 21Agent is open source.
 
-Contributions from protocol developers, security researchers, AI engineers, Solana developers, and people building strange things onchain are welcome.
-
 ```bash
 git clone https://github.com/21dao/21agent.git
+
 cd 21agent
+
 npm install
+
 npm run build
 ```
 
-Open an issue.
+Build an extension.
 
-Build a skill.
+Add a skill.
 
-Write an extension.
-
-Add a chain.
+Improve the Robinhood Chain integration.
 
 Break something.
 
 Fix it.
+
+Ship it.
 
 ---
 
@@ -486,8 +540,8 @@ MIT
 
 ---
 
-**21Agent**
+# 21Agent
 
-*The onchain coding agent by 21DAO.*
+**Code locally. Execute onchain.**
 
-**Solana first. Chain agnostic by design.**
+Built by **21DAO** for **Robinhood Chain**.

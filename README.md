@@ -1,194 +1,219 @@
-# 21DAO
+# 21Agent
 
-**Chain-agnostic tooling for the onchain world.**
+**The onchain coding agent by 21DAO.**
 
-21DAO is an open-source, local-first agent workspace for developers building onchain applications.
+21Agent is an open-source coding agent built for developers working across Solana and the onchain ecosystem.
 
-It combines repository-aware AI agents, development tools, blockchain interfaces, and auditable execution into a single environment designed for experimenting, debugging, and shipping onchain software.
+It combines an AI-native terminal workflow with repository awareness, blockchain tooling, transaction inspection, program analysis, and extensible developer skills.
 
-Solana is the first deeply integrated network, with the architecture designed to remain chain-agnostic.
-
----
-
-## Overview
-
-Modern onchain development is fragmented across repositories, RPC providers, explorers, wallets, CLIs, documentation, testing environments, and deployment tooling.
-
-21DAO brings these workflows into one programmable runtime.
-
-Agents can understand a repository, inspect programs, execute development tools, interact with Solana infrastructure, simulate transactions, analyze results, and maintain a persistent record of their actions.
-
-The goal is simple:
-
-**Make onchain development agent-native.**
+Built by **21DAO** — chain-agnostic hackers building infrastructure for the onchain world.
 
 ---
 
-## Core Principles
+## What is 21Agent?
 
-### Local First
+21Agent is a coding environment designed around a simple idea:
 
-Projects, agent state, execution history, and development context remain local by default.
+**Your coding agent should understand the chain you're building on.**
 
-21DAO is designed as a developer environment rather than a remote black box.
+Traditional coding agents understand files, repositories, terminals, and development environments.
 
-### Auditable Execution
+21Agent extends that model into the onchain world.
 
-Agent activity is represented as structured events.
+It can work with:
 
-Messages, tool calls, tool results, transaction simulations, permission decisions, errors, and termination events can be recorded as an append-only execution history.
-
-This makes agent behavior inspectable and reproducible.
-
-### Repository Aware
-
-21DAO agents operate with knowledge of the repository they are working inside.
-
-Agents can inspect project structure, source code, dependencies, configuration, Git history, and development scripts before taking action.
-
-### Onchain Native
-
-Blockchain interaction is treated as a first-class development primitive.
-
-21DAO provides interfaces for:
-
-* RPC interaction
-* wallet operations
-* transaction construction
-* transaction simulation
-* program inspection
-* account inspection
-* instruction decoding
+* source code
+* Git repositories
+* terminal commands
+* Solana programs
+* RPC endpoints
+* transactions
+* accounts
+* instructions
+* IDLs
+* Anchor projects
+* wallets
+* program logs
 * deployment workflows
-* onchain debugging
 
-### Chain Agnostic
-
-Solana is the first major integration.
-
-The runtime itself is not designed around a single blockchain.
-
-Protocol adapters allow additional chains, execution environments, and developer stacks to be integrated without rebuilding the core agent system.
+Instead of switching between your coding agent, explorer, RPC console, CLI, documentation, and debugging tools, 21Agent brings those workflows into one programmable environment.
 
 ---
 
-## Solana
+## Quick Start
 
-21DAO ships with dedicated tooling for Solana developers.
+```bash
+npm install -g @21dao/21agent
+```
 
-The Solana adapter provides agents with structured access to programs, accounts, transactions, instructions, RPC methods, and development environments.
+Start 21Agent inside your project:
 
-Example workflows include:
+```bash
+cd my-project
+21agent
+```
+
+Then talk to it.
 
 ```text
-> inspect this Solana program
+> explain this repository
+
+> find the bug in this program
+
+> inspect the Anchor instructions
+
+> analyze this Solana transaction
 
 > explain why this transaction failed
 
-> trace the instructions executed by this transaction
-
-> analyze this repository before deployment
-
-> simulate this transaction locally
-
-> inspect all accounts touched by this instruction
-
-> find potential problems in this Anchor program
-
 > generate tests for this program
+
+> inspect the accounts touched by this instruction
+
+> review this program before deployment
 ```
-
-The objective is not to replace existing Solana tooling.
-
-21DAO gives agents a common interface for using it.
 
 ---
 
-## Architecture
+## Solana Native
+
+Solana is the first deeply integrated network in 21Agent.
+
+21Agent understands common Solana development primitives and can expose them directly to the model.
 
 ```text
-21dao/
-│
-├── apps/
-│   ├── cli/
-│   └── workspace/
-│
-├── packages/
-│   ├── agent/
-│   ├── core/
-│   ├── runtime/
-│   ├── github/
-│   ├── solana/
-│   ├── wallet/
-│   ├── rpc/
-│   ├── simulator/
-│   └── tools/
-│
-├── protocols/
-│   ├── solana/
-│   └── adapters/
-│
-├── skills/
-│   ├── program-inspector/
-│   ├── transaction-debugger/
-│   ├── repo-analysis/
-│   └── contract-review/
-│
-├── examples/
-├── docs/
-├── scripts/
-└── tests/
+Repository
+    │
+    ├── Source
+    ├── Anchor
+    ├── IDL
+    └── Tests
+         │
+         ▼
+     21Agent
+         │
+    ┌────┼──────────┐
+    │    │          │
+   RPC  Programs  Transactions
+    │    │          │
+    └────┼──────────┘
+         ▼
+       Solana
 ```
 
-### `agent`
-
-Agent lifecycle, context management, reasoning interfaces, permissions, and execution control.
-
-### `runtime`
-
-Coordinates agents, tools, execution environments, events, and state.
-
-### `github`
-
-Repository-aware tooling for source inspection, Git operations, project discovery, and development workflows.
-
-### `solana`
-
-Native Solana integration and developer primitives.
-
-### `rpc`
-
-RPC abstraction and provider management.
-
-### `simulator`
-
-Transaction and program simulation interfaces.
-
-### `tools`
-
-Standardized tools exposed to agents during execution.
-
-### `protocols`
-
-Chain-specific adapters that connect the 21DAO runtime to external execution environments.
+Use 21Agent to inspect programs, reason about instructions, decode transactions, analyze accounts, simulate execution, and debug onchain behavior without leaving your development workflow.
 
 ---
 
-## Execution Model
+## Repository Aware
 
-Every agent session can be represented as a sequence of events.
+21Agent operates inside your repository.
+
+It can inspect:
 
 ```text
-Session Started
+src/
+programs/
+tests/
+scripts/
+migrations/
+package.json
+Anchor.toml
+Cargo.toml
+.git/
+```
+
+This gives the model context about what you're actually building before it starts changing code.
+
+Reference files directly:
+
+```text
+@programs/vault/src/lib.rs
+
+@Anchor.toml
+
+@tests/vault.ts
+```
+
+Or ask questions across the entire project:
+
+```text
+> map this codebase
+
+> explain how funds move through this protocol
+
+> find every instruction that can modify authority
+
+> review the repository for unsafe account validation
+```
+
+---
+
+## Tools
+
+21Agent exposes development capabilities as tools.
+
+Core tools include:
+
+```text
+read
+write
+edit
+bash
+grep
+find
+git
+rpc
+solana
+simulate
+inspect
+```
+
+The agent decides when and how to use them while working through a task.
+
+Additional capabilities can be installed or implemented without changing the core agent.
+
+---
+
+## Skills
+
+Skills provide reusable onchain workflows.
+
+```text
+skills/
+├── anchor-review/
+├── program-inspector/
+├── transaction-debugger/
+├── repo-analysis/
+├── account-inspector/
+├── security-review/
+├── deployment-check/
+└── protocol-research/
+```
+
+Example:
+
+```text
+/skill:transaction-debugger
+```
+
+21Agent can then inspect the transaction, retrieve execution information, analyze program logs, identify relevant instructions, and explain likely failure conditions.
+
+Developers can build and distribute their own skills.
+
+---
+
+## Sessions
+
+Development sessions can be persisted locally.
+
+A session records the interaction between the developer, model, repository, and tools.
+
+```text
+Developer Prompt
       │
       ▼
-User Request
-      │
-      ▼
-Repository Context
-      │
-      ▼
-Agent Decision
+Agent Reasoning
       │
       ▼
 Tool Call
@@ -197,161 +222,272 @@ Tool Call
 Tool Result
       │
       ▼
-Onchain Simulation
+Code / Chain Interaction
       │
       ▼
 Agent Response
-      │
-      ▼
-Session Completed
 ```
 
-Rather than hiding this process, 21DAO makes execution history inspectable.
-
-This allows developers to understand not only **what** an agent produced, but **how it got there**.
+Sessions make complex development workflows easier to continue, inspect, reproduce, and debug.
 
 ---
 
-## GitHub-Native Development
+## Multiple Models
 
-21DAO treats the repository as the primary unit of context.
+21Agent is designed to remain model-agnostic.
 
-Agents can reason about:
+Use the model that fits your workflow.
+
+```bash
+21agent --provider anthropic
+21agent --provider openai
+21agent --provider google
+```
+
+Model providers and available models can be configured independently from the core runtime.
+
+21DAO does not believe your development environment should be permanently tied to a single model provider.
+
+---
+
+## Interactive Mode
+
+Run:
+
+```bash
+21agent
+```
+
+to launch the interactive terminal environment.
+
+From there you can work with the agent like another developer sitting inside your repository.
 
 ```text
-source code
-dependencies
-commits
-branches
-configuration
-tests
-documentation
-program interfaces
-deployment scripts
+21agent >
+
+> inspect programs/token-vault
+
+Reading program...
+
+> identify the authority model
+
+Analyzing instructions and account constraints...
+
+> now check whether any instruction can bypass it
+
+Searching program instructions...
 ```
 
-This allows agents to operate with substantially more context than isolated code-generation prompts.
+The agent can read files, modify code, execute commands, inspect repository state, and invoke onchain development tools.
 
 ---
 
-## Tools
+## CLI
 
-Tools are modular capabilities exposed to the agent runtime.
+```bash
+21agent [options] [@files...] [prompt]
+```
+
+Examples:
+
+```bash
+21agent "Explain this repository"
+```
+
+```bash
+21agent @programs/vault/src/lib.rs "Review this program"
+```
+
+```bash
+21agent -p "Find potential security issues"
+```
+
+```bash
+21agent --model claude "Refactor this instruction"
+```
+
+```bash
+21agent --tools read,grep,find "Perform a read-only review"
+```
+
+---
+
+## Extensions
+
+21Agent is designed to be hacked.
+
+Extensions can add:
+
+* custom tools
+* custom commands
+* Solana integrations
+* protocol integrations
+* RPC providers
+* security scanners
+* deployment systems
+* wallet interfaces
+* sub-agents
+* custom UI
+* Git workflows
+* sandbox environments
+
+Example:
 
 ```ts
-interface Tool {
-  name: string;
-  description: string;
+export default function (agent: ExtensionAPI) {
+  agent.registerTool({
+    name: "inspect_transaction",
+    // ...
+  });
 
-  execute(
-    input: ToolInput,
-    context: RuntimeContext
-  ): Promise<ToolResult>;
+  agent.registerCommand("audit", {
+    // ...
+  });
 }
 ```
 
-Tools can interact with local development environments, repositories, blockchain infrastructure, or external developer services.
-
-Developers can also create their own tools and expose them to 21DAO agents.
+If your workflow needs something 21Agent doesn't have, build it.
 
 ---
 
-## Skills
+## Architecture
 
-Skills are reusable workflows built on top of the runtime.
+```text
+21agent/
+│
+├── packages/
+│   ├── agent/
+│   ├── core/
+│   ├── runtime/
+│   ├── cli/
+│   ├── tui/
+│   ├── github/
+│   ├── solana/
+│   ├── rpc/
+│   ├── wallet/
+│   └── tools/
+│
+├── skills/
+│   ├── anchor-review/
+│   ├── program-inspector/
+│   ├── transaction-debugger/
+│   ├── account-inspector/
+│   └── security-review/
+│
+├── extensions/
+│   ├── solana/
+│   ├── github/
+│   └── providers/
+│
+├── examples/
+├── docs/
+├── scripts/
+└── tests/
+```
 
-Initial skills include:
+The core stays small.
 
-**Program Inspector**
-
-Analyze program architecture, instructions, accounts, and dependencies.
-
-**Transaction Debugger**
-
-Inspect failed transactions and identify likely failure conditions.
-
-**Repository Analysis**
-
-Map an unfamiliar repository and explain its architecture.
-
-**Contract Review**
-
-Perform structured analysis of onchain programs before deployment.
-
----
-
-## Why 21DAO?
-
-AI coding agents are becoming capable developers.
-
-Blockchains are becoming programmable financial infrastructure.
-
-The tooling connecting those two worlds is still primitive.
-
-21DAO explores what happens when agents become first-class participants in onchain development.
-
-Not another chatbot.
-
-Not another explorer.
-
-Not another RPC wrapper.
-
-**An execution environment for onchain agents.**
+Everything else is composable.
 
 ---
 
-## Roadmap
+## Chain Agnostic
 
-**01 — Solana Runtime**
+21Agent starts with Solana.
 
-Repository analysis, RPC tooling, program inspection, transaction simulation, and local agent execution.
+It does not end with Solana.
 
-**02 — Developer Skills**
+Blockchain-specific functionality is implemented through adapters and extensions rather than being permanently embedded into the core runtime.
 
-Reusable workflows for debugging, security analysis, testing, deployment, and protocol research.
+```text
+                 21Agent
+                    │
+          ┌─────────┼─────────┐
+          │         │         │
+       Solana      EVM      Other
+          │         │         │
+       Adapter    Adapter    Adapter
+```
 
-**03 — Multi-Agent Execution**
-
-Specialized agents collaborating across larger repositories and development tasks.
-
-**04 — Additional Chains**
-
-Introduce protocol adapters while keeping the core runtime chain-agnostic.
-
-**05 — Open Agent Infrastructure**
-
-Allow developers to build, publish, and compose their own onchain tools and skills.
+The long-term goal is a common agent interface for building software across onchain environments.
 
 ---
 
-## Status
+## Philosophy
 
-21DAO is experimental software under active development.
+21Agent is built around four principles.
 
-Interfaces, packages, and architecture may change rapidly.
+### Minimal Core
 
-Do not use experimental agent-generated transactions with production wallets or valuable assets without independent verification.
+Keep the agent runtime small and understandable.
+
+### Onchain Native
+
+Blockchains should be first-class development environments, not external APIs bolted onto an AI coding tool.
+
+### Extensible
+
+Developers should be able to modify the agent around their workflow instead of modifying their workflow around the agent.
+
+### Chain Agnostic
+
+Networks change.
+
+Models change.
+
+Developer tooling changes.
+
+The core should survive all three.
+
+---
+
+## Built by 21DAO
+
+21DAO is a chain-agnostic collective of onchain hackers, developers, and researchers.
+
+We build experimental infrastructure at the intersection of crypto, AI, and open-source software.
+
+21Agent is our coding agent for that world.
+
+**Hack locally. Ship onchain.**
 
 ---
 
 ## Contributing
 
-21DAO is built for hackers, protocol developers, security researchers, and developers experimenting at the intersection of AI and crypto.
+21Agent is open source.
 
-Issues, experiments, integrations, tools, and pull requests are welcome.
+Contributions from protocol developers, security researchers, AI engineers, Solana developers, and people building strange things onchain are welcome.
 
 ```bash
-git clone https://github.com/21dao/21dao.git
-cd 21dao
+git clone https://github.com/21dao/21agent.git
+cd 21agent
+npm install
+npm run build
 ```
 
-Build something weird.
+Open an issue.
+
+Build a skill.
+
+Write an extension.
+
+Add a chain.
+
+Break something.
+
+Fix it.
 
 ---
 
-## 21DAO
+## License
 
-**Chain-agnostic hackers building tools for the onchain world.**
+MIT
 
-Solana first.
-Onchain everywhere.
+---
+
+**21Agent**
+
+*The onchain coding agent by 21DAO.*
+
+**Solana first. Chain agnostic by design.**

@@ -1,7 +1,7 @@
 ````markdown
 # 21Agent
 
-**The coding agent for Solana.**
+**The coding agent for EVM & Solana.**
 
 21Agent is an open-source coding agent built by **21DAO** for developers building on Solana.
 
